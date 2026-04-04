@@ -10,17 +10,16 @@
         <slot name="navigation"></slot>
       </div>
       <div class="header-right">
-        <slot name="user-menu"></slot>
+        <slot name="user-menu">
+          <ProfileDropdown />
+        </slot>
       </div>
     </div>
   </header>
 </template>
 
 <script setup>
-/**
- * AppHeader — верхняя шапка приложения
- * Использует слоты для кастомизации контента
- */
+import ProfileDropdown from './ProfileDropdown.vue'
 </script>
 
 <style scoped>

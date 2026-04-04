@@ -77,6 +77,11 @@
 import { ref } from 'vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import RegistryUploader from '../../components/university/RegistryUploader.vue'
+import { useAuth } from '../../composables/useAuth.js'
+import { useDiplomas } from '../../composables/useDiplomas.js'
+
+const { user } = useAuth()
+const { createDiploma } = useDiplomas()
 
 const uploadLog = ref([])
 let logId = 1
@@ -90,21 +95,55 @@ function addLog(message, type = 'info') {
   })
 }
 
-function onSubmit(records) {
-  addLog(`Начало загрузки: ${records.length} записей`, 'info')
+function pickField(row, keys, fallback = '') {
+  for (const k of keys) {
+    if (row[k] != null && String(row[k]).trim() !== '') return String(row[k]).trim()
+  }
+  return fallback
+}
 
-  // Эмуляция обработки
-  let processed = 0
-  const interval = setInterval(() => {
-    processed += Math.min(10, records.length - processed)
-    addLog(`Обработано: ${processed}/${records.length}`, 'info')
+async function onSubmit(records) {
+  const uni = user.value?.universityCode
+  if (!uni) {
+    addLog('В профиле нет кода университета. Войдите как ВУЗ или укажите код при регистрации.', 'error')
+    return
+  }
 
-    if (processed >= records.length) {
-      clearInterval(interval)
-      addLog(`Генерация хешей завершена`, 'success')
-      addLog(`Загружено в реестр: ${records.length} дипломов`, 'success')
+  addLog(`Начало выпуска через API: ${records.length} записей`, 'info')
+
+  let ok = 0
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i]
+    const rowNum = i + 2
+    try {
+      const studentId = pickField(r, ['studentId', 'StudentId', 'UUID студента', 'uuid'])
+      const diplomaNumber = pickField(r, ['diplomaNumber', 'serialNumber', 'Серийный номер', 'Номер'])
+      const fullName = pickField(r, ['fullName', 'studentName', 'ФИО', 'student_name'])
+      const specialty = pickField(r, ['specialty', 'Специальность'])
+      const gy = pickField(r, ['graduationYear', 'year', 'Год', 'issueDate'], String(new Date().getFullYear()))
+      const graduationYear = parseInt(gy, 10) || new Date().getFullYear()
+
+      if (!studentId || !diplomaNumber || !fullName || !specialty) {
+        addLog(`Строка ${rowNum}: не хватает полей (нужны studentId, номер, ФИО, специальность)`, 'error')
+        continue
+      }
+
+      await createDiploma({
+        universityCode: uni,
+        studentId,
+        diplomaNumber,
+        fullName,
+        specialty,
+        graduationYear,
+      })
+      ok++
+      addLog(`Строка ${rowNum}: выпущен ${diplomaNumber}`, 'success')
+    } catch (e) {
+      addLog(`Строка ${rowNum}: ${e.message || 'ошибка'}`, 'error')
     }
-  }, 300)
+  }
+
+  addLog(`Готово: успешно ${ok} из ${records.length}`, ok === records.length ? 'success' : 'info')
 }
 
 function onError(err) {
@@ -113,8 +152,8 @@ function onError(err) {
 
 function downloadTemplate() {
   // Заглушка для скачивания шаблона
-  const headers = 'serialNumber,studentName,specialty,issueDate\n'
-  const sample = '2026-00001,Иванов Иван Иванович,Программная инженерия,2026-06-30\n'
+  const headers = 'studentId,diplomaNumber,fullName,specialty,graduationYear\n'
+  const sample = 'ed97654b-7963-4ef2-97af-99fc78753d5a,DIP-2026-001,Иванов Иван Иванович,Программная инженерия,2026\n'
   const blob = new Blob([headers + sample], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

@@ -1,142 +1,157 @@
 /**
- * useAuth — управление аутентификацией
- * Сессия, роль, токены, logout — реальный API бэкенда ДиплоРеестр
+ * useAuth — JWT из бэкенда (accessToken), без refresh.
+ * Профиль дополняется данными регистрации и хранится в localStorage.
  */
 import { ref, computed } from 'vue'
 import { api } from '../api/api.js'
 
-const user = ref(null)
-const accessToken = ref(localStorage.getItem('access_token') || null)
-const refreshToken = ref(localStorage.getItem('refresh_token') || null)
+const PROFILE_KEY = 'user_profile'
 
-const isAuthenticated = computed(() => !!accessToken.value)
-const role = computed(() => {
-  if (!user.value) return null
-  // Бэкенд возвращает role как enum: UNIVERSITY, STUDENT, HR
-  return user.value.role?.toLowerCase() || null
-})
-
-// Маппинг ролей бэкенда -> фронтенд
-const ROLE_MAP = {
-  UNIVERSITY: 'university',
-  STUDENT: 'student',
-  HR: 'hr',
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 
+function saveProfile(p) {
+  if (p) localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
+  else localStorage.removeItem(PROFILE_KEY)
+}
+
+function mapBackendRole(role) {
+  const r = String(role || '').toUpperCase()
+  if (r === 'EMPLOYER') return 'hr'
+  if (r === 'UNIVERSITY') return 'university'
+  if (r === 'STUDENT') return 'student'
+  return r.toLowerCase() || 'student'
+}
+
+const user = ref(loadProfile())
+const accessToken = ref(localStorage.getItem('access_token') || null)
+
+const isAuthenticated = computed(() => !!accessToken.value)
+const role = computed(() => user.value?.role || null)
+
 export function useAuth() {
-  /**
-   * Войти по email/password
-   */
-  async function login(username, password) {
-    const res = await api.login({ username, password })
-    _setSession(res)
-    return res.user
-  }
+  function _applyLoginResponse(res, merge = {}) {
+    const token = res.accessToken
+    if (!token) throw new Error('Сервер не вернул accessToken')
 
-  /**
-   * Зарегистрировать пользователя
-   * data: { email, password, name, role }
-   * role: 'university' | 'student' | 'hr' (будет преобразовано в enum)
-   */
-  async function register(data) {
-    const roleEnum = data.role?.toUpperCase() || 'STUDENT'
-    const res = await api.register({
-      email: data.email,
-      password: data.password,
-      name: data.name,
-      role: roleEnum,
-    })
-    _setSession(res)
-    return res.user
-  }
+    accessToken.value = token
+    localStorage.setItem('access_token', token)
+    localStorage.removeItem('refresh_token')
 
-  /**
-   * Обновить access token через refresh
-   */
-  async function refresh() {
-    if (!refreshToken.value) return false
-    try {
-      const res = await api.refresh(refreshToken.value)
-      _setSession(res)
-      return true
-    } catch {
-      _clearSession()
-      return false
-    }
-  }
+    const prev = loadProfile()
+    const roleLower = mapBackendRole(res.role)
 
-  /**
-   * Выход
-   */
-  async function logout() {
-    if (refreshToken.value && accessToken.value) {
-      try {
-        await api.logout(refreshToken.value, accessToken.value)
-      } catch {
-        // Игнорируем ошибку при logout
-      }
-    }
-    _clearSession()
-  }
-
-  /**
-   * Инициализация — валидация токена через stats endpoint
-   */
-  async function init() {
-    if (!accessToken.value || !refreshToken.value) {
-      _clearSession()
-      return
-    }
-    try {
-      const stats = await api.getStats(accessToken.value)
-      // Stats возвращает данные в зависимости от роли
-      // UNIVERSITY: universityName
-      // STUDENT: studentEmail, studentName
-      // HR: hrName
-      const name = stats.universityName || stats.studentName || stats.hrName || ''
-      const roleRaw = stats.universityName ? 'UNIVERSITY' : stats.studentEmail ? 'STUDENT' : 'HR'
-
-      user.value = {
-        id: stats.universityId || stats.userId,
-        name,
-        role: ROLE_MAP[roleRaw] || roleRaw.toLowerCase(),
-      }
-    } catch {
-      // Пробуем refresh
-      const ok = await refresh()
-      if (!ok) _clearSession()
-    }
-  }
-
-  function _setSession(res) {
-    accessToken.value = res.access_token
-    refreshToken.value = res.refresh_token
-    localStorage.setItem('access_token', res.access_token)
-    localStorage.setItem('refresh_token', res.refresh_token)
-
-    const roleLower = res.user.role?.toLowerCase() || 'student'
-    user.value = {
-      id: res.user.id,
-      name: res.user.name,
+    const nextProfile = {
+      id: res.userId,
+      email: res.email,
       role: roleLower,
+      name:
+        merge.name ??
+        prev?.name ??
+        (res.email ? String(res.email).split('@')[0] : 'Пользователь'),
+      universityCode: merge.universityCode ?? prev?.universityCode ?? null,
+      universityId: merge.universityId ?? prev?.universityId ?? null,
+      studentId: merge.studentId ?? prev?.studentId ?? null,
+      employerId: merge.employerId ?? prev?.employerId ?? null,
+      companyName: merge.companyName ?? prev?.companyName ?? null,
     }
+
+    user.value = nextProfile
+    saveProfile(nextProfile)
     localStorage.setItem('user_role', roleLower)
   }
 
-  function _clearSession() {
+  async function login(email, password) {
+    const res = await api.login({ email, password })
+    _applyLoginResponse(res, {})
+    return user.value
+  }
+
+  async function register(data) {
+    const { email, password, name, role } = data
+
+    let merge = {}
+
+    if (role === 'university') {
+      const r = await api.registerUniversity({
+        universityName: name,
+        universityCode: data.universityCode,
+        email,
+        password,
+      })
+      merge = {
+        name: r.universityName || name,
+        universityCode: r.universityCode,
+        universityId: r.universityId,
+      }
+    } else if (role === 'student') {
+      const r = await api.registerStudent({
+        fullName: name,
+        birthDate: data.birthDate,
+        studentNumber: data.studentNumber,
+        email,
+        password,
+      })
+      merge = {
+        name: r.fullName || name,
+        studentId: r.studentId,
+      }
+    } else if (role === 'hr') {
+      const r = await api.registerEmployer({
+        companyName: name,
+        email,
+        password,
+      })
+      merge = {
+        name: r.companyName || name,
+        companyName: r.companyName || name,
+        employerId: r.employerId,
+      }
+    } else {
+      throw new Error('Неизвестная роль')
+    }
+
+    const loginRes = await api.login({ email, password })
+    _applyLoginResponse(loginRes, merge)
+    return user.value
+  }
+
+  async function refresh() {
+    return false
+  }
+
+  async function logout() {
     user.value = null
     accessToken.value = null
-    refreshToken.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_role')
+    saveProfile(null)
+  }
+
+  async function init() {
+    const token = localStorage.getItem('access_token')
+    const profile = loadProfile()
+    if (!token || !profile?.id) {
+      await logout()
+      return
+    }
+    accessToken.value = token
+    user.value = profile
+    localStorage.setItem('user_role', profile.role || '')
   }
 
   return {
     user,
-    token: accessToken,       // обратно совместимость
+    token: accessToken,
     accessToken,
-    refreshToken,
+    refreshToken: ref(null),
     role,
     isAuthenticated,
     login,

@@ -17,12 +17,22 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await login(loginVal.value, pwdVal.value)
-    const redirect = route.query.redirect || '/university/dashboard'
+    const u = await login(loginVal.value, pwdVal.value)
+    const byRole = {
+      university: '/university/dashboard',
+      student: '/student/dashboard',
+      hr: '/hr/verify',
+    }
+    const fallback = byRole[u?.role] || '/university/dashboard'
+    const redirect = route.query.redirect || fallback
     router.push(redirect)
   } catch (err) {
     if (err.status === 401) {
-      error.value = 'Неверный логин или пароль'
+      error.value = 'Неверный email или пароль'
+    } else if (err.errors) {
+      // Backend validation errors
+      const messages = Object.values(err.errors).flat()
+      error.value = messages.join('. ') || 'Ошибка сервера'
     } else {
       error.value = err.message || 'Ошибка сервера. Попробуйте позже.'
     }

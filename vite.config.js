@@ -12,15 +12,30 @@ export default defineConfig(({ mode }) => {
       allowedHosts: ['buoyantly-positive-prawn.cloudpub.ru'],
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          target: env.VITE_API_BASE_URL || 'http://localhost:8081',
           changeOrigin: true,
+          timeout: 120_000,
+          proxyTimeout: 120_000,
+          rewriteRequestHeaders: (headers) => {
+            // Удаляем origin чтобы бэкенд не блокировал CORS
+            delete headers.origin;
+            delete headers.referer;
+            return headers;
+          },
         },
         '/v3': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          target: env.VITE_API_BASE_URL || 'http://localhost:8081',
           changeOrigin: true,
+          timeout: 120_000,
+          proxyTimeout: 120_000,
+          rewriteRequestHeaders: (headers) => {
+            delete headers.origin;
+            delete headers.referer;
+            return headers;
+          },
         },
         '/actuator': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          target: env.VITE_API_BASE_URL || 'http://localhost:8081',
           changeOrigin: true,
         },
       },

@@ -1,38 +1,103 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth.js'
 
 const router = useRouter()
 const { register } = useAuth()
 
-const nameVal = ref('')
+// Выбор роли: 'university' | 'student' | 'hr'
+const roleVal = ref('')
+
+// Общие поля
 const emailVal = ref('')
 const pwdVal = ref('')
+const nameVal = ref('')
+const universityCodeVal = ref('')
+const studentNumberVal = ref('')
+const birthDateVal = ref('')
 const showPwd = ref(false)
-const roleVal = ref('')
+
 const loading = ref(false)
 const error = ref('')
 
+// Дашборд по роли
+const roleDashboardMap = {
+  university: '/university/dashboard',
+  student: '/student/dashboard',
+  hr: '/hr/verify'
+}
+
+// Валидация перед отправкой
+function validate() {
+  if (!roleVal.value) {
+    error.value = 'Выберите тип аккаунта'
+    return false
+  }
+  if (!emailVal.value || !pwdVal.value || !nameVal.value) {
+    error.value = 'Заполните все обязательные поля'
+    return false
+  }
+  if (roleVal.value === 'university' && !universityCodeVal.value.trim()) {
+    error.value = 'Укажите код университета'
+    return false
+  }
+  if (roleVal.value === 'student') {
+    if (!studentNumberVal.value.trim()) {
+      error.value = 'Укажите номер студенческого билета'
+      return false
+    }
+    if (!birthDateVal.value) {
+      error.value = 'Укажите дату рождения'
+      return false
+    }
+  }
+  if (pwdVal.value.length < 6) {
+    error.value = 'Пароль должен содержать минимум 6 символов'
+    return false
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(emailVal.value)) {
+    error.value = 'Неверный формат email'
+    return false
+  }
+  return true
+}
+
 async function submit() {
   error.value = ''
+  if (!validate()) {
+    loading.value = false
+    return
+  }
+
   loading.value = true
   try {
-    await register({
-      name: nameVal.value,
+    const payload = {
       email: emailVal.value,
       password: pwdVal.value,
+      name: nameVal.value,
       role: roleVal.value,
-    })
-    // Редирект зависит от роли
-    const roleDashboards = {
-      university: '/university/dashboard',
-      student: '/student/dashboard',
-      hr: '/hr/verify',
+      universityCode: universityCodeVal.value.trim(),
+      studentNumber: studentNumberVal.value.trim(),
+      birthDate: birthDateVal.value,
     }
-    router.push(roleDashboards[roleVal.value] || '/login')
+
+    await register(payload)
+    // Redirect to appropriate dashboard based on role
+    const redirect = roleDashboardMap[roleVal.value] || '/university/dashboard'
+    router.push(redirect)
   } catch (err) {
-    error.value = err.message || 'Ошибка регистрации'
+    if (err.status === 409) {
+      error.value = 'Пользователь с таким email уже существует'
+    } else if (err.errors) {
+      const messages = Object.values(err.errors).flatMap((v) =>
+        Array.isArray(v) ? v : [v]
+      )
+      error.value = messages.join('. ') || 'Ошибка регистрации'
+    } else {
+      error.value = err.message || 'Ошибка регистрации'
+    }
   } finally {
     loading.value = false
   }
@@ -59,19 +124,69 @@ async function submit() {
         </p>
       </div>
 
-      <form @submit.prevent="submit" class="rform">
-        <div class="rform__field">
-          <label class="rform__label">Название организации / ФИО</label>
-          <input
-            v-model="nameVal"
-            type="text"
-            placeholder="МГТУ им. Баумана"
-            class="rform__input"
-            autocomplete="organization"
-            required
-          />
-        </div>
+      <!-- ===== Выбор роли (вверху) ===== -->
+      <div class="register-box__roles">
+        <button
+          type="button"
+          class="role-btn"
+          :class="{ 'role-btn--active': roleVal === 'university' }"
+          @click="roleVal = 'university'; error = ''"
+        >
+          <span class="role-btn__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="8" width="18" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7 8V5a5 5 0 0110 0v3" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="12" cy="14.5" r="1.5" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+          </span>
+          <span class="role-btn__text">
+            <span class="role-btn__title">ВУЗ</span>
+            <span class="role-btn__desc">Учебное заведение</span>
+          </span>
+        </button>
 
+        <button
+          type="button"
+          class="role-btn"
+          :class="{ 'role-btn--active': roleVal === 'student' }"
+          @click="roleVal = 'student'; error = ''"
+        >
+          <span class="role-btn__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3L3 8l9 5 9-5-9-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M6 10v5c0 2 2.5 3.5 6 4.5 3.5-1 6-2.5 6-4.5v-5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="role-btn__text">
+            <span class="role-btn__title">Студент</span>
+            <span class="role-btn__desc">Выпускник / Учащийся</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="role-btn"
+          :class="{ 'role-btn--active': roleVal === 'hr' }"
+          @click="roleVal = 'hr'; error = ''"
+        >
+          <span class="role-btn__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M6 9h3M6 13h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M16 9v6M14 12h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="role-btn__text">
+            <span class="role-btn__title">HR</span>
+            <span class="role-btn__desc">Работодатель</span>
+          </span>
+        </button>
+      </div>
+
+      <!-- ===== Форма (показывается после выбора роли) ===== -->
+      <form v-if="roleVal" @submit.prevent="submit" class="rform">
+        
+        <!-- Общие поля -->
         <div class="rform__field">
           <label class="rform__label">Email</label>
           <input
@@ -103,7 +218,7 @@ async function submit() {
               tabindex="-1"
             >
               <svg v-if="!showPwd" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M1 10s3.5-7 9-7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
                 <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
               </svg>
               <svg v-else width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -113,67 +228,81 @@ async function submit() {
           </div>
         </div>
 
-        <!-- Выбор роли -->
-        <div class="rform__field">
-          <label class="rform__label">Тип аккаунта</label>
-          <div class="rform__roles">
-            <button
-              type="button"
-              class="rform__role"
-              :class="{ 'rform__role--active': roleVal === 'university' }"
-              @click="roleVal = 'university'"
-            >
-              <span class="rform__role-icon">
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                  <rect x="6" y="10" width="16" height="14" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
-                  <path d="M10 10V6a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.6"/>
-                  <circle cx="14" cy="17" r="2" stroke="currentColor" stroke-width="1.4"/>
-                </svg>
-              </span>
-              <span class="rform__role-content">
-                <span class="rform__role-title">ВУЗ</span>
-                <span class="rform__role-desc">Учебное заведение</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              class="rform__role"
-              :class="{ 'rform__role--active': roleVal === 'student' }"
-              @click="roleVal = 'student'"
-            >
-              <span class="rform__role-icon">
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                  <path d="M14 4L4 9l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-                  <path d="M8 11v6c0 2 2.5 4 6 5 3.5-1 6-3 6-5v-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                </svg>
-              </span>
-              <span class="rform__role-content">
-                <span class="rform__role-title">Студент</span>
-                <span class="rform__role-desc">Выпускник / Учащийся</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              class="rform__role"
-              :class="{ 'rform__role--active': roleVal === 'hr' }"
-              @click="roleVal = 'hr'"
-            >
-              <span class="rform__role-icon">
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                  <rect x="4" y="6" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/>
-                  <path d="M9 12h2M9 16h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                  <path d="M18 12v6M15 15h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                </svg>
-              </span>
-              <span class="rform__role-content">
-                <span class="rform__role-title">HR / Работодатель</span>
-                <span class="rform__role-desc">Проверка дипломов</span>
-              </span>
-            </button>
+        <!-- Поля для ВУЗа -->
+        <template v-if="roleVal === 'university'">
+          <div class="rform__field">
+            <label class="rform__label">Название организации</label>
+            <input
+              v-model="nameVal"
+              type="text"
+              placeholder="МГТУ им. Баумана"
+              class="rform__input"
+              autocomplete="organization"
+              required
+            />
           </div>
-        </div>
+          <div class="rform__field">
+            <label class="rform__label">Код университета</label>
+            <input
+              v-model="universityCodeVal"
+              type="text"
+              placeholder="AITU-01"
+              class="rform__input"
+              autocomplete="off"
+              required
+            />
+          </div>
+        </template>
+
+        <!-- Поля для Студента -->
+        <template v-if="roleVal === 'student'">
+          <div class="rform__field">
+            <label class="rform__label">ФИО полностью</label>
+            <input
+              v-model="nameVal"
+              type="text"
+              placeholder="Иванов Иван Иванович"
+              class="rform__input"
+              autocomplete="name"
+              required
+            />
+          </div>
+          <div class="rform__field">
+            <label class="rform__label">Номер студенческого билета</label>
+            <input
+              v-model="studentNumberVal"
+              type="text"
+              placeholder="ST-2026-001"
+              class="rform__input"
+              autocomplete="off"
+              required
+            />
+          </div>
+          <div class="rform__field">
+            <label class="rform__label">Дата рождения</label>
+            <input
+              v-model="birthDateVal"
+              type="date"
+              class="rform__input"
+              required
+            />
+          </div>
+        </template>
+
+        <!-- Поля для HR -->
+        <template v-if="roleVal === 'hr'">
+          <div class="rform__field">
+            <label class="rform__label">Название компании</label>
+            <input
+              v-model="nameVal"
+              type="text"
+              placeholder="ООО «Технологии»"
+              class="rform__input"
+              autocomplete="organization"
+              required
+            />
+          </div>
+        </template>
 
         <!-- Ошибка -->
         <div v-if="error" class="rform__error">
@@ -192,6 +321,15 @@ async function submit() {
           </button>
         </div>
       </form>
+
+      <!-- Подсказка, если роль не выбрана -->
+      <div v-else class="register-box__hint">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2" opacity="0.5"/>
+          <path d="M8 5v4M8 10.5v.3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+        <span>Выберите тип аккаунта выше, чтобы продолжить</span>
+      </div>
     </div>
   </div>
 </template>
@@ -207,7 +345,7 @@ async function submit() {
   background: #0d1f3c;
 }
 
-/* ---- Фон как hero ---- */
+/* ---- Фон ---- */
 .register-page__bg {
   position: fixed;
   inset: 0;
@@ -219,10 +357,7 @@ async function submit() {
 .register-page__bg-grid {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(
-      rgba(255, 255, 255, 0.03) 1px,
-      transparent 1px
-    ),
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
 }
@@ -265,6 +400,7 @@ async function submit() {
 .register-box__hero {
   padding: var(--space-8) var(--space-8) var(--space-4);
   text-align: center;
+  border-bottom: 1px solid var(--color-gray-blue);
 }
 
 .register-box__title {
@@ -287,12 +423,97 @@ async function submit() {
   margin: 0 auto;
 }
 
-/* ===== Форма ===== */
-.rform {
-  padding: 0 var(--space-8) var(--space-8);
+/* ===== Выбор роли (вверху) ===== */
+.register-box__roles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--color-gray-blue);
+  border-bottom: 1px solid var(--color-gray-blue);
+}
+
+.role-btn {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--color-pale-black);
+  font-family: var(--font-family);
+  text-align: center;
+}
+
+.role-btn:hover {
+  background: #f8fafc;
+  color: var(--color-main-blue);
+}
+
+.role-btn--active {
+  background: var(--color-pale-blue);
+  color: var(--color-main-blue);
+  font-weight: var(--font-weight-semibold);
+}
+
+.role-btn__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--color-pale-blue);
+  border-radius: var(--radius-base);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.role-btn--active .role-btn__icon {
+  background: var(--color-main-blue);
+  color: #fff;
+}
+
+.role-btn__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.role-btn__title {
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+}
+
+.role-btn__desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-pale-black);
+  line-height: 1.2;
+}
+
+.role-btn--active .role-btn__desc {
+  color: var(--color-gray);
+}
+
+/* ===== Подсказка ===== */
+.register-box__hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--font-size-sm);
+  color: var(--color-pale-black);
+  background: #f8fafc;
+  border-bottom: 1px solid var(--color-gray-blue);
+}
+
+/* ===== Форма ===== */
+.rform {
+  padding: var(--space-6) var(--space-8) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .rform__field {
@@ -329,70 +550,6 @@ async function submit() {
 
 .rform__input-wrap { position: relative; }
 .rform__input-wrap .rform__input { padding-right: 46px; }
-
-/* ===== Роли ===== */
-.rform__roles {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.rform__role {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--color-pale-blue);
-  border: 1.5px solid transparent;
-  border-radius: var(--radius-base);
-  cursor: pointer;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
-  color: var(--color-pale-black);
-  font-family: var(--font-family);
-  text-align: left;
-  width: 100%;
-}
-
-.rform__role:hover {
-  background-color: #dde5f0;
-}
-
-.rform__role--active {
-  border-color: var(--color-main-blue);
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(38, 75, 130, 0.08);
-  color: var(--color-main-blue);
-}
-
-.rform__role-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: color var(--transition-fast);
-}
-
-.rform__role-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.rform__role-title {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.3;
-}
-
-.rform__role-desc {
-  font-size: var(--font-size-xs);
-  color: var(--color-pale-black);
-  transition: color var(--transition-fast);
-}
-
-.rform__role--active .rform__role-desc {
-  color: var(--color-gray);
-}
 
 /* ===== Глаз ===== */
 .rform__eye {
@@ -481,6 +638,30 @@ async function submit() {
 /* ===========================
    АДАПТИВ
    =========================== */
+@media (max-width: 640px) {
+  .register-box__roles {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  
+  .role-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+  }
+  
+  .role-btn__icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .role-btn__desc {
+    display: none;
+  }
+}
+
 @media (max-width: 540px) {
   .register-page { padding: var(--space-4) var(--space-3); }
 
@@ -488,7 +669,7 @@ async function submit() {
   .register-box__title { font-size: var(--font-size-xl); }
   .register-box__subtitle { font-size: var(--font-size-xs); }
 
-  .rform { padding: 0 var(--space-6) var(--space-6); gap: var(--space-4); }
+  .rform { padding: 0 var(--space-6) var(--space-6); gap: var(--space-3); }
 
   .rform__actions {
     flex-direction: column-reverse;
@@ -497,8 +678,5 @@ async function submit() {
   }
 
   .rform__submit { width: 100%; padding: 12px; }
-
-  .rform__role { padding: var(--space-3); gap: var(--space-3); }
-  .rform__role-icon svg { width: 24px; height: 24px; }
 }
 </style>

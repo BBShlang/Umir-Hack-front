@@ -24,7 +24,6 @@
 
             <div class="reports__hero-actions">
               <router-link to="/hr/verify" class="reports__btn reports__btn--outline">Одиночная проверка</router-link>
-              <router-link to="/hr/bulk" class="reports__btn reports__btn--outline">Массовая проверка</router-link>
             </div>
 
             <div class="reports__examples">
@@ -39,44 +38,32 @@
         </div>
       </section>
 
+
       <!-- ===== Основная рабочая зона ===== -->
       <section class="reports__workspace">
         <div class="container">
-          <div class="reports__workspace-head">
-            <p class="reports__workspace-eyebrow">Аналитика и интеграция</p>
-            <h2 class="reports__workspace-title">Отчёты и API доступ</h2>
-          </div>
-
-          <div class="reports__workspace-grid">
+          <div class="dashboard-layout">
             <!-- Левая колонка: отчёты -->
-            <div class="reports__workspace-panel">
-              <div class="reports__panel-header">
-                <div class="reports__panel-icon">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M7 7h6M7 10h6M7 13h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <div class="reports__panel-title-wrap">
-                  <h3 class="reports__panel-title">Аудит</h3>
-                  <p class="reports__panel-desc">История верификаций и экспорт данных</p>
-                </div>
+            <section class="section-pro">
+              <div class="section-header">
+                <h2>Аудит и отчёты</h2>
+                <span class="badge">Доступно</span>
               </div>
 
               <div class="reports__checker-card">
                 <AuditReport />
               </div>
-            </div>
+            </section>
 
-            <!-- Правая колонка: API + инструкции -->
-            <div class="reports__workspace-sidebar">
+            <!-- Правая колонка: сайдбар -->
+            <aside class="info-sidebar">
               <!-- API доступ -->
-              <div class="reports__sidebar-card reports__sidebar-card--accent">
-                <h4 class="reports__sidebar-title">API доступ</h4>
+              <div class="info-card">
+                <h4>API доступ</h4>
                 <div class="reports__api-mini">
                   <div class="reports__api-mini-row">
                     <span class="reports__api-label">Endpoint</span>
-                    <code class="reports__api-code">/api/verify</code>
+                    <code class="reports__api-code">/api/test/crypto/verify</code>
                   </div>
                   <div class="reports__api-mini-row">
                     <span class="reports__api-label">Метод</span>
@@ -97,8 +84,8 @@
               </div>
 
               <!-- Требования -->
-              <div class="reports__sidebar-card">
-                <h4 class="reports__sidebar-title">Возможности API</h4>
+              <div class="info-card">
+                <h4>Возможности API</h4>
                 <ul class="reports__sidebar-list">
                   <li>
                     <span class="reports__sidebar-list-icon">
@@ -140,8 +127,8 @@
               </div>
 
               <!-- Быстрые действия -->
-              <div class="reports__sidebar-card">
-                <h4 class="reports__sidebar-title">Быстрые действия</h4>
+              <div class="info-card">
+                <h4>Быстрые действия</h4>
                 <div class="reports__sidebar-actions">
                   <router-link to="/hr/verify" class="reports__sidebar-btn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -150,18 +137,9 @@
                     </svg>
                     Проверить диплом
                   </router-link>
-                  <router-link to="/hr/bulk" class="reports__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                    </svg>
-                    Массовая проверка
-                  </router-link>
                 </div>
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       </section>
@@ -173,17 +151,202 @@
 </template>
 
 <script setup>
+import { FileText } from 'lucide-vue-next'
 import AppFooter from '../../components/common/AppFooter.vue'
 import AuditReport from '../../components/hr/AuditReport.vue'
 import ApiAccessWidget from '../../components/hr/ApiAccessWidget.vue'
 
 function onOpenDocs() {
-  window.open('/api-docs', '_blank')
+  const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+  if (base) window.open(`${base}/swagger-ui/index.html`, '_blank', 'noopener,noreferrer')
+  else window.open('/api-docs', '_blank', 'noopener,noreferrer')
 }
 </script>
 
 <style scoped>
 .reports-view { min-height: 100vh; }
+.main-content { flex: 1; }
+
+/* ===========================
+   Info Banner
+   =========================== */
+.info-banner {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: #e8f4fd;
+  border: 1px solid #b8dff5;
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
+  align-items: flex-start;
+}
+
+.banner-icon-bg {
+  background: #b8dff5;
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-icon {
+  color: #1a5b8c;
+}
+
+.banner-text h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: #1a5b8c;
+  margin: 0 0 var(--space-1);
+}
+
+.banner-text p {
+  font-size: var(--font-size-sm);
+  color: #2d7ab5;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ===========================
+   WORKSPACE / Dashboard Layout
+   =========================== */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Section Pro */
+.section-pro {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-gray-blue);
+  padding: var(--space-6);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.section-header h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
+  margin: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Info Sidebar */
+.info-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.info-card {
+  background: #fff;
+  border: 1px solid var(--color-gray-blue);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.info-card h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
+  margin: 0 0 var(--space-3);
+}
+
+.info-card p {
+  font-size: var(--font-size-sm);
+  color: var(--color-pale-black);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Список возможностей */
+.reports__sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.reports__sidebar-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-pale-black);
+  text-align: left;
+}
+
+.reports__sidebar-list-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--color-green);
+  flex-shrink: 0;
+}
+
+/* Быстрые действия */
+.reports__sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.reports__sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-pale-black);
+  background: var(--color-pale-blue);
+  border-radius: var(--radius-base);
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  width: 100%;
+}
+
+.reports__sidebar-btn svg {
+  flex-shrink: 0;
+  color: var(--color-main-blue);
+}
+
+.reports__sidebar-btn:hover {
+  background: #dde5f0;
+  color: var(--color-main-blue);
+}
 
 /* ===========================
    HERO
@@ -760,77 +923,18 @@ function onOpenDocs() {
    АДАПТИВ
    =========================== */
 @media (max-width: 1100px) {
-  .reports__stats-inner { grid-template-columns: repeat(2, 1fr); }
-  .reports__stat:nth-child(2) { border-right: none; }
-  .reports__stat:nth-child(1), .reports__stat:nth-child(2) { border-bottom: 1px solid var(--color-gray-blue); }
-
-  .reports__workspace-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .reports__workspace-sidebar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
+  .dashboard-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
   .reports__hero { padding: 44px 0 48px; }
   .reports__hero-title { font-size: clamp(1.5rem, 6vw, 2.2rem); }
-  .reports__hero-subtitle { font-size: var(--font-size-sm); }
-
-  .reports__stat {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    padding: var(--space-3) var(--space-4);
-  }
-  .reports__stat-value { font-size: var(--font-size-base); }
-  .reports__stat-note { display: none; }
-
-  .reports__steps { flex-direction: column; gap: var(--space-3); }
-  .reports__step { padding: var(--space-4); }
-  .reports__step::after { display: none; }
-
-  .reports__workspace,
-  .reports__features,
-  .reports__cta { padding: 48px 0; }
-
-  .reports__workspace-title { font-size: var(--font-size-2xl); }
-  .reports__workspace-head { margin-bottom: var(--space-8); }
-
-  .reports__checker-card { padding: var(--space-4); }
-
-  .reports__panel-header { padding: var(--space-4); }
-
-  .reports__workspace-sidebar {
-    grid-template-columns: 1fr;
-  }
-
-  .reports__features-title { font-size: var(--font-size-2xl); }
-  .reports__features-head { margin-bottom: var(--space-8); }
+  .reports__workspace { padding: 48px 0; }
+  .section-header h2 { font-size: var(--font-size-xl); }
 }
 
 @media (max-width: 540px) {
   .reports__hero { padding: 32px 0 40px; }
   .reports__hero-title { font-size: 1.5rem; line-height: 1.2; }
-  .reports__hero-subtitle { font-size: var(--font-size-sm); }
-  .reports__examples { flex-direction: column; align-items: flex-start; }
-
-  .reports__stats-inner { grid-template-columns: 1fr 1fr; }
-  .reports__stat {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: var(--space-3) var(--space-3);
-    gap: 2px;
-  }
-  .reports__stat:nth-child(1), .reports__stat:nth-child(3) { border-right: 1px solid var(--color-gray-blue); }
-  .reports__stat:nth-child(2), .reports__stat:nth-child(4) { border-right: none; }
-  .reports__stat-value { font-size: var(--font-size-base); white-space: normal; }
-  .reports__stat-label { font-size: 11px; }
-  .reports__stat-note { display: none; }
-
-  .reports__workspace-title { font-size: var(--font-size-xl); }
 }
 </style>
