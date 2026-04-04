@@ -1,74 +1,72 @@
 /**
- * useVerification — проверка хэша/номера, статус, rate-limit mock
+ * useVerification — проверка дипломов по серийному номеру, хешу, QR
+ * Реальный API бэкенда ДиплоРеестр
  */
 import { ref } from 'vue'
+import { api } from '../api/api.js'
+import { useAuth } from './useAuth.js'
 
-const lastChecks = ref([])
-const RATE_LIMIT_WINDOW = 60_000 // 1 минута
-const RATE_LIMIT_MAX = 10 // макс. запросов за окно
+const verifying = ref(false)
+const verificationResult = ref(null)
+const verificationError = ref(null)
 
 export function useVerification() {
-  const verifying = ref(false)
-  const verificationResult = ref(null)
-  const verificationError = ref(null)
+  const { accessToken } = useAuth()
 
   /**
-   * Проверить диплом по серийному номеру
-   * @param {string} serialNumber
+   * Проверить диплом по серийному номеру или хешу
+   * @param {object} params — { serial?: string, hash?: string }
    * @returns {Promise<object>}
    */
-  async function verifyBySerial(serialNumber) {
-    if (!serialNumber?.trim()) {
-      throw new Error('Введите серийный номер')
+  async function verify(params) {
+    if (!params.serial && !params.hash) {
+      throw new Error('Укажите серийномер или хеш')
     }
-
-    checkRateLimit()
 
     verifying.value = true
     verificationError.value = null
     verificationResult.value = null
 
     try {
-      // TODO: заменить на GET /api/verify?serial=...
-      await new Promise(r => setTimeout(r, 800))
-
-      const result = mockVerify(serialNumber.trim())
-      verificationResult.value = result
-      recordCheck()
-
-      return result
+      const res = await api.verify(params, accessToken.value)
+      verificationResult.value = res
+      return res
     } catch (err) {
       verificationError.value = err.message
       throw err
     } finally {
       verifying.value = false
     }
+  }
+
+  /**
+   * Проверить диплом по серийному номеру
+   */
+  async function verifyBySerial(serialNumber) {
+    return verify({ serial: serialNumber })
   }
 
   /**
    * Проверить диплом по хешу
-   * @param {string} hash
-   * @returns {Promise<object>}
    */
   async function verifyByHash(hash) {
-    if (!hash?.trim()) {
-      throw new Error('Введите хеш')
-    }
+    return verify({ hash })
+  }
 
-    checkRateLimit()
-
+  /**
+   * Массовая проверка дипломов
+   * @param {string[]} serials
+   * @returns {Promise<object[]>}
+   */
+  async function verifyBulk(serials) {
     verifying.value = true
     verificationError.value = null
+    verificationResult.value = null
 
     try {
-      // TODO: заменить на GET /api/verify?hash=...
-      await new Promise(r => setTimeout(r, 800))
-
-      const result = mockVerifyByHash(hash.trim())
-      verificationResult.value = result
-      recordCheck()
-
-      return result
+      const res = await api.verifyBulk(serials, accessToken.value)
+      verificationResult.value = res
+      return res
     } catch (err) {
       verificationError.value = err.message
       throw err
@@ -78,46 +76,33 @@ export function useVerification() {
   }
 
   /**
-   * Проверить по QR-токену
-   * @param {string} token
+   * Проверить по QR-токену (публичная верификация)
+   * @param {string} token — share token
    * @returns {Promise<object>}
    */
   async function verifyByQR(token) {
-    checkRateLimit()
-
     verifying.value = true
     verificationError.value = null
+    verificationResult.value = null
 
     try {
-      await new Promise(r => setTimeout(r, 600))
-
-      const result = mockVerifyByQR(token)
-      verificationResult.value = result
-      recordCheck()
-
-      return result
-    } catch (err) {
-      verificationError.value = err.message
-      throw err
+      // Пробуем сначала публичный endpoint
+      const res = await api.publicVerify(token)
+      verificationResult.value = res
+      return res
+    } catch {
+      // Если не вышло — через share endpoint
+      try {
+        const res = await api.verifyShare(token)
+        verificationResult.value = res
+        return res
+      } catch (err2) {
+        verificationError.value = err2.message
+        throw err2
+      }
     } finally {
       verifying.value = false
     }
-  }
-
-  function checkRateLimit() {
-    const now = Date.now()
-    const recent = lastChecks.value.filter(t => now - t < RATE_LIMIT_WINDOW)
-
-    if (recent.length >= RATE_LIMIT_MAX) {
-      throw new Error('Слишком много запросов. Подождите минуту.')
-    }
-  }
-
-  function recordCheck() {
-    lastChecks.value.push(Date.now())
-    // Очистка старых записей
-    const now = Date.now()
-    lastChecks.value = lastChecks.value.filter(t => now - t < RATE_LIMIT_WINDOW)
   }
 
   function reset() {
@@ -130,56 +115,11 @@ export function useVerification() {
     verifying,
     verificationResult,
     verificationError,
+    verify,
     verifyBySerial,
     verifyByHash,
     verifyByQR,
-    reset
-  }
-}
-
-// ---- Mock-функции ----
-
-function mockVerify(serial) {
-  // Эмуляция: каждые 5-й номер — невалиден
-  const isValid = !serial.endsWith('0') && !serial.endsWith('5')
-
-  if (isValid) {
-    return {
-      isValid: true,
-      status: 'active',
-      serialNumber: serial,
-      university: 'МГТУ им. Баумана',
-      specialty: 'Информатика и вычислительная техника',
-      degree: 'Бакалавр',
-      issueDate: '15.06.2025',
-      hash: 'a1b2c3d4e5f6' + '0'.repeat(52)
-    }
-  }
-
-  return {
-    isValid: false,
-    status: 'error',
-    serialNumber: serial,
-    reason: 'Диплом не найден в реестре'
-  }
-}
-
-function mockVerifyByHash(hash) {
-  const found = hash.length >= 64
-  return {
-    isValid: found,
-    status: found ? 'active' : 'error',
-    hash,
-    university: found ? 'МГУ' : null,
-    reason: found ? '' : 'Хеш не найден'
-  }
-}
-
-function mockVerifyByQR(token) {
-  const valid = token && token.length > 10
-  return {
-    isValid: valid,
-    status: valid ? 'active' : 'expired',
-    reason: valid ? '' : 'QR-ссылка недействительна или истекла'
+    verifyBulk,
+    reset,
   }
 }

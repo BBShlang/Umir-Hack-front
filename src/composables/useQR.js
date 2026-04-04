@@ -1,81 +1,84 @@
 /**
- * useQR — генерация QR, TTL-таймер, отзыв ссылки
+ * useQR — управление share-токенами, генерация QR-ссылок
+ * Реальный API бэкенда ДиплоРеестр
  */
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
+import { api } from '../api/api.js'
+import { useAuth } from './useAuth.js'
 
-const qrLinks = ref(new Map())
-let timerInterval = null
+const shareTokens = ref([])
+const loading = ref(false)
+const error = ref(null)
 
 export function useQR() {
-  /**
-   * Создать временную ссылку для проверки
-   * @param {string} diplomaHash
-   * @param {number} ttlDays - срок жизни в днях
-   * @returns {string} URL
-   */
-  function createShareLink(diplomaHash, ttlDays = 7) {
-    const token = generateToken()
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + ttlDays)
-
-    const linkData = {
-      token,
-      hash: diplomaHash,
-      expiresAt: expiresAt.toISOString(),
-      isActive: true
-    }
-
-    qrLinks.value.set(token, linkData)
-
-    startTimer()
-
-    return `${window.location.origin}/verify/share/${token}`
-  }
+  const { accessToken } = useAuth()
 
   /**
-   * Проверить валидность ссылки
-   * @param {string} token
-   * @returns {{ valid: boolean, data: object|null, reason: string }}
+   * Создать share-токен для диплома
+   * @param {number} diplomaId
+   * @param {number} ttlDays — срок жизни в днях (1-30, по умолч. 7)
+   * @returns {Promise<{token, url, expiresAt}>}
    */
-  function verifyShareToken(token) {
-    const data = qrLinks.value.get(token)
-    if (!data) {
-      return { valid: false, data: null, reason: 'Ссылка не найдена' }
-    }
-
-    if (!data.isActive) {
-      return { valid: false, data: null, reason: 'Ссылка отозвана' }
-    }
-
-    if (new Date() > new Date(data.expiresAt)) {
-      return { valid: false, data: null, reason: 'Срок действия истёк' }
-    }
-
-    return { valid: true, data, reason: '' }
-  }
-
-  /**
-   * Отозвать ссылку
-   * @param {string} token
-   */
-  function revokeLink(token) {
-    const data = qrLinks.value.get(token)
-    if (data) {
-      data.isActive = false
-      qrLinks.value.set(token, data)
+  async function createShareToken(diplomaId, ttlDays = 7) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api.createShareToken({ diplomaId, ttlDays }, accessToken.value)
+      // Обновляем список
+      await fetchTokens()
+      return res
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
   }
 
   /**
-   * Получить оставшееся время
-   * @param {string} token
-   * @returns {string|null}
+   * Получить список активныхых токенов пользователя
    */
-  function getTimeLeft(token) {
-    const data = qrLinks.value.get(token)
-    if (!data) return null
+  async function fetchTokens() {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api.getShareTokens(accessToken.value)
+      shareTokens.value = res || []
+      return shareTokens.value
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
 
-    const left = new Date(data.expiresAt) - new Date()
+  /**
+   * Отозвать share-токен
+   * @param {string} token
+   */
+  async function revokeToken(token) {
+    loading.value = true
+    error.value = null
+    try {
+      await api.deleteShareToken(token, accessToken.value)
+      await fetchTokens()
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Получить оставшееся время для токена
+   * @param {string} expiresAt — ISO дата
+   * @returns {string}
+   */
+  function getTimeLeft(expiresAt) {
+    if (!expiresAt) return ''
+    const left = new Date(expiresAt) - new Date()
     if (left <= 0) return 'Истекло'
 
     const days = Math.floor(left / (1000 * 60 * 60 * 24))
@@ -85,26 +88,31 @@ export function useQR() {
     return `${hours} ч.`
   }
 
-  function startTimer() {
-    if (timerInterval) return
-    timerInterval = setInterval(() => {
-      // Таймер тикает — UI может подписаться на getTimeLeft
-    }, 60000)
+  /**
+   * Построить полную URL для share-токена
+   * @param {string} token
+   * @returns {string}
+   */
+  function buildShareUrl(token) {
+    const base = window.location.origin
+    return `${base}/verify/share/${token}`
   }
 
-  function generateToken() {
-    return btoa(Date.now().toString() + Math.random().toString()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24)
+  function reset() {
+    shareTokens.value = []
+    loading.value = false
+    error.value = null
   }
-
-  onUnmounted(() => {
-    if (timerInterval) clearInterval(timerInterval)
-  })
 
   return {
-    qrLinks,
-    createShareLink,
-    verifyShareToken,
-    revokeLink,
-    getTimeLeft
+    shareTokens,
+    loading,
+    error,
+    createShareToken,
+    fetchTokens,
+    revokeToken,
+    getTimeLeft,
+    buildShareUrl,
+    reset,
   }
 }

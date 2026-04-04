@@ -1,90 +1,139 @@
 /**
  * useDiplomas — CRUD дипломов, фильтрация, пагинация
+ * Реальный API бэкенда ДиплоРеестр
  */
 import { ref, computed } from 'vue'
+import { api } from '../api/api.js'
+import { useAuth } from './useAuth.js'
 
 const diplomas = ref([])
 const loading = ref(false)
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
-const search = ref('')
-const statusFilter = ref('all')
+const searchQuery = ref('')
+const statusFilter = ref(null) // null = all, ACTIVE, REVOKED, PENDING
+const sortField = ref('createdAt')
+const sortDir = ref('desc')
+const error = ref(null)
 
 export function useDiplomas() {
-  const filteredDiplomas = computed(() => {
-    let items = diplomas.value
-
-    if (search.value) {
-      const q = search.value.toLowerCase()
-      items = items.filter(d =>
-        d.serialNumber?.toLowerCase().includes(q) ||
-        d.studentName?.toLowerCase().includes(q) ||
-        d.specialty?.toLowerCase().includes(q)
-      )
-    }
-
-    if (statusFilter.value !== 'all') {
-      items = items.filter(d => d.status === statusFilter.value)
-    }
-
-    return items
-  })
+  const { accessToken } = useAuth()
 
   const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
-  const paginatedDiplomas = computed(() => {
-    const start = (page.value - 1) * pageSize.value
-    return filteredDiplomas.value.slice(start, start + pageSize.value)
-  })
-
+  /**
+   * Получить список дипломов с фильтрацией и пагинацией
+   */
   async function fetchDiplomas() {
     loading.value = true
-    // TODO: заменить на реальный API-вызов GET /api/diplomas
-    await new Promise(r => setTimeout(r, 600))
+    error.value = null
+    try {
+      const params = {
+        page: page.value,
+        pageSize: pageSize.value,
+        sort: sortField.value,
+        sortDir: sortDir.value,
+      }
+      if (searchQuery.value) params.search = searchQuery.value
+      if (statusFilter.value) params.status = statusFilter.value
 
-    diplomas.value = generateMockDiplomas(25)
-    total.value = diplomas.value.length
-    loading.value = false
-  }
-
-  async function fetchDiplomaById(id) {
-    // TODO: GET /api/diplomas/:id
-    return diplomas.value.find(d => d.id === Number(id)) || null
-  }
-
-  async function createDiploma(data) {
-    // TODO: POST /api/diplomas
-    const newDiploma = {
-      id: Date.now(),
-      ...data,
-      status: 'active',
-      createdAt: new Date().toISOString()
+      const res = await api.getDiplomas(params, accessToken.value)
+      diplomas.value = res.data || []
+      total.value = res.total || 0
+      return res
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
-    diplomas.value.unshift(newDiploma)
-    total.value++
-    return newDiploma
   }
 
+  /**
+   * Получить один диплом по ID
+   */
+  async function fetchDiplomaById(id) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api.getDiploma(id, accessToken.value)
+      return res
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Создать диплом (только UNIVERSITY)
+   */
+  async function createDiploma(data) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api.createDiploma(data, accessToken.value)
+      // Обновляем список
+      await fetchDiplomas()
+      return res
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Обновить диплом (только UNIVERSITY)
+   */
   async function updateDiploma(id, data) {
-    // TODO: PATCH /api/diplomas/:id
-    const idx = diplomas.value.findIndex(d => d.id === id)
-    if (idx === -1) return null
-    diplomas.value[idx] = { ...diplomas.value[idx], ...data }
-    return diplomas.value[idx]
+    loading.value = true
+    error.value = null
+    try {
+      const res = await api.updateDiploma(id, data, accessToken.value)
+      await fetchDiplomas()
+      return res
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
   }
 
+  /**
+   * Отозвать диплом (только UNIVERSITY)
+   */
   async function revokeDiploma(id) {
-    return updateDiploma(id, { status: 'revoked' })
+    loading.value = true
+    error.value = null
+    try {
+      await api.deleteDiploma(id, accessToken.value)
+      await fetchDiplomas()
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
   }
 
   function setSearch(val) {
-    search.value = val
+    searchQuery.value = val
     page.value = 1
   }
 
   function setStatusFilter(val) {
-    statusFilter.value = val
+    statusFilter.value = val || null
+    page.value = 1
+  }
+
+  function setSort(field, direction) {
+    sortField.value = field
+    sortDir.value = direction || 'desc'
     page.value = 1
   }
 
@@ -92,15 +141,32 @@ export function useDiplomas() {
     page.value = p
   }
 
+  function setPageSize(s) {
+    pageSize.value = s
+    page.value = 1
+  }
+
+  function reset() {
+    diplomas.value = []
+    total.value = 0
+    page.value = 1
+    searchQuery.value = ''
+    statusFilter.value = null
+    error.value = null
+  }
+
   return {
-    diplomas: paginatedDiplomas,
+    diplomas,
     loading,
     total,
     page,
     pageSize,
     totalPages,
-    search,
+    search: searchQuery,
     statusFilter,
+    sortField,
+    sortDir,
+    error,
     fetchDiplomas,
     fetchDiplomaById,
     createDiploma,
@@ -108,26 +174,9 @@ export function useDiplomas() {
     revokeDiploma,
     setSearch,
     setStatusFilter,
-    setPage
+    setSort,
+    setPage,
+    setPageSize,
+    reset,
   }
-}
-
-function generateMockDiplomas(count) {
-  const universities = ['МГТУ им. Баумана', 'МГУ', 'СПбГУ', 'НИЯУ МИФИ', 'ВШЭ']
-  const specialties = ['Информатика', 'Математика', 'Физика', 'Экономика', 'Юриспруденция']
-  const statuses = ['active', 'active', 'active', 'revoked', 'pending']
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    serialNumber: `DIP-${(100000 + i).toString().padStart(10, '0')}`,
-    studentName: `Студент ${i + 1}`,
-    specialty: specialties[i % specialties.length],
-    degree: 'Бакалавр',
-    university: universities[i % universities.length],
-    issueDate: `2025-0${(i % 9) + 1}-${(i % 28) + 1}`,
-    status: statuses[i % statuses.length],
-    hash: Array.from({ length: 64 }, () =>
-      'abcdef0123456789'[Math.floor(Math.random() * 16)]
-    ).join('')
-  }))
 }

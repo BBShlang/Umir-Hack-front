@@ -202,7 +202,6 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { Camera, Upload, X, CheckCircle, AlertCircle, History } from 'lucide-vue-next'
-import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import VerificationForm from '../../components/hr/VerificationForm.vue'
 

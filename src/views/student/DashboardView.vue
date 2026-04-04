@@ -13,60 +13,61 @@
         <div class="container dashboard__hero-inner">
           <div class="dashboard__hero-content">
             <h1 class="dashboard__title">
-              Мои дипломы<br />
-              <span class="dashboard__title-accent">Личный кабинет студента</span>
+              Личный кабинет студента<br />
+              <span class="dashboard__title-accent">Diasoft Verify</span>
             </h1>
 
             <p class="dashboard__subtitle">
               Найдите свой диплом по номеру или ФИО, поделитесь с работодателем и отслеживайте проверки.
             </p>
-            <div class="diplomas__hero-actions">
-              <router-link to="/student/diplomas" class="diplomas__btn diplomas__btn--outline">Мои дипломы</router-link>
-              <router-link to="/student/share" class="diplomas__btn diplomas__btn--outline">Поделиться дипломом</router-link>
+            <div class="dashboard__hero-actions">
+              <router-link to="/student/diplomas" class="dashboard__btn dashboard__btn--outline">Мои дипломы</router-link>
             </div>
-              </div>
-            </div>
-
+          </div>
+        </div>
       </section>
+
+      <!-- ===== Info Banner ===== -->
+      <div class="container">
+        <div class="info-banner">
+          <div class="banner-icon-bg">
+            <Search :size="24" class="banner-icon" />
+          </div>
+          <div class="banner-text">
+            <h4>Быстрый поиск диплома</h4>
+            <p>Введите номер диплома или начните вводить ФИО — система подскажет совпадения из вашего профиля.</p>
+          </div>
+        </div>
+      </div>
 
       <!-- ===== Основная рабочая зона ===== -->
       <section class="dashboard__workspace">
         <div class="container">
-          <div class="dashboard__workspace-head">
-            <p class="dashboard__workspace-eyebrow">Поиск диплома</p>
-            <h2 class="dashboard__workspace-title">Найдите свой документ</h2>
-          </div>
-
-          <div class="dashboard__workspace-grid">
+          <div class="dashboard-layout">
             <!-- Левая колонка: форма поиска -->
-            <div class="dashboard__workspace-panel">
-              <div class="dashboard__panel-header">
-                <div class="dashboard__panel-icon">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M12 12l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <div class="dashboard__panel-title-wrap">
-                  <h3 class="dashboard__panel-title">Поиск</h3>
-                  <p class="dashboard__panel-desc">Введите номер диплома или выберите ФИО</p>
-                </div>
+            <section class="section-pro">
+              <div class="section-header">
+                <h2>Поиск диплома</h2>
+                <span class="badge">Онлайн</span>
               </div>
 
               <div class="dashboard__search-card">
                 <form @submit.prevent="onSearch" class="sf">
                   <div class="sf-field">
                     <label class="sf-label">Номер диплома или ФИО</label>
-                    <input
-                      v-model="searchQuery"
-                      type="text"
-                      class="sf-input"
-                      placeholder="Например: 12345678901234"
-                      autocomplete="off"
-                      spellcheck="false"
-                      @input="onSearchInput"
-                      @focus="showSuggestions = true"
-                    />
+                    <div class="sf-input-wrapper">
+                      <Search :size="18" class="sf-input-icon" />
+                      <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="sf-input"
+                        placeholder="Например: DIP-2023-001"
+                        autocomplete="off"
+                        spellcheck="false"
+                        @input="onSearchInput"
+                        @focus="showSuggestions = true"
+                      />
+                    </div>
 
                     <!-- Автодополнение ФИО -->
                     <Transition name="sf-fade">
@@ -77,10 +78,7 @@
                           class="sf-suggestion"
                           @click="selectName(name)"
                         >
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.2"/>
-                            <path d="M2 13c0-3 2.5-5 5-5s5 2 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                          </svg>
+                          <User :size="14" />
                           {{ name }}
                         </li>
                       </ul>
@@ -88,12 +86,9 @@
                   </div>
 
                   <button type="submit" class="sf-btn" :disabled="loading || !searchQuery.trim()">
-                    <svg v-if="loading" class="sf-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round">
-                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/>
-                      </circle>
-                    </svg>
-                    <span>{{ loading ? 'Поиск…' : 'Найти' }}</span>
+                    <Search v-if="!loading" :size="18" />
+                    <Loader2 v-else :size="18" class="sf-spin" />
+                    <span>{{ loading ? 'Поиск…' : 'Найти диплом' }}</span>
                   </button>
                 </form>
 
@@ -102,121 +97,71 @@
                   <div v-if="diplomaResult" class="sf-res" :class="diplomaResult.statusClass">
                     <div class="sf-res-head">
                       <span class="sf-res-icon" :class="{ 'sf-res-icon--ok': diplomaResult.isValid }">
-                        <svg v-if="diplomaResult.isValid" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
-                          <path d="M6 10l3 3 5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <svg v-else width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>
-                          <path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                        </svg>
+                        <CheckCircle v-if="diplomaResult.isValid" :size="20" />
+                        <AlertCircle v-else :size="20" />
                       </span>
                       <h4 class="sf-res-title">{{ diplomaResult.title }}</h4>
                     </div>
-                    <dl v-if="diplomaResult.isValid" class="sf-res-grid">
-                      <span class="sf-res-k">ВУЗ</span>
-                      <span class="sf-res-v">{{ diplomaResult.university || '—' }}</span>
-                      <span class="sf-res-k">Специальность</span>
-                      <span class="sf-res-v">{{ diplomaResult.specialty || '—' }}</span>
-                      <span class="sf-res-k">Дата выдачи</span>
-                      <span class="sf-res-v">{{ diplomaResult.issueDate || '—' }}</span>
-                      <span class="sf-res-k">Статус</span>
-                      <span class="sf-res-v"><StatusBadge :status="diplomaResult.status" /></span>
-                    </dl>
+                    <div v-if="diplomaResult.isValid" class="sf-res-details">
+                      <div class="sf-detail-row">
+                        <Building2 :size="16" class="sf-detail-icon" />
+                        <span class="sf-detail-k">ВУЗ</span>
+                        <span class="sf-detail-v">{{ diplomaResult.university || '—' }}</span>
+                      </div>
+                      <div class="sf-detail-row">
+                        <GraduationCap :size="16" class="sf-detail-icon" />
+                        <span class="sf-detail-k">Специальность</span>
+                        <span class="sf-detail-v">{{ diplomaResult.specialty || '—' }}</span>
+                      </div>
+                      <div class="sf-detail-row">
+                        <Calendar :size="16" class="sf-detail-icon" />
+                        <span class="sf-detail-k">Дата выдачи</span>
+                        <span class="sf-detail-v">{{ diplomaResult.issueDate || '—' }}</span>
+                      </div>
+                      <div class="sf-detail-row">
+                        <ShieldCheck :size="16" class="sf-detail-icon" />
+                        <span class="sf-detail-k">Статус</span>
+                        <span class="sf-detail-v"><StatusBadge :status="diplomaResult.status" /></span>
+                      </div>
+                    </div>
                   </div>
                 </Transition>
 
                 <Transition name="sf-fade">
                   <div v-if="searchError" class="sf-err">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/>
-                      <path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                    </svg>
+                    <AlertCircle :size="16" />
                     <span>{{ searchError }}</span>
                   </div>
                 </Transition>
               </div>
-            </div>
+            </section>
 
-            <!-- Правая колонка: быстрые действия -->
-            <div class="dashboard__workspace-sidebar">
-              <div class="dashboard__sidebar-card">
-                <h4 class="dashboard__sidebar-title">Мои действия</h4>
-                <div class="dashboard__sidebar-actions">
-                  <router-link to="/student/diplomas" class="dashboard__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                      <path d="M2 6h12" stroke="currentColor" stroke-width="1.2"/>
-                    </svg>
-                    Все дипломы
-                  </router-link>
-                  <router-link to="/student/share" class="dashboard__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="11" cy="3" r="2" stroke="currentColor" stroke-width="1.3"/>
-                      <circle cx="4" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/>
-                      <circle cx="11" cy="13" r="2" stroke="currentColor" stroke-width="1.3"/>
-                      <path d="M6 9l3 3M6 7l3-3" stroke="currentColor" stroke-width="1.2"/>
-                    </svg>
-                    Поделиться дипломом
-                  </router-link>
-                  <router-link to="/student/diplomas" class="dashboard__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                      <path d="M6 6h4M6 9h4M6 12h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                    </svg>
-                    История проверок
-                  </router-link>
+            <!-- Правая колонка: сайдбар -->
+            <aside class="info-sidebar">
+              <div class="info-card">
+                <div class="sidebar-icon-wrap bg-blue">
+                  <ShieldCheck :size="24" />
                 </div>
+                <h4>Безопасность</h4>
+                <p>Все дипломы защищены криптографической подписью вуза и проверяются в реальном времени.</p>
               </div>
 
-              <div class="dashboard__sidebar-card dashboard__sidebar-card--accent">
-                <h4 class="dashboard__sidebar-title">Подсказка</h4>
-                <p class="dashboard__sidebar-hint">
-                  Введите серийный номер диплома или начните вводить ФИО — система подскажет совпадения из вашего профиля.
-                </p>
+              <div class="info-card">
+                <div class="sidebar-icon-wrap bg-green">
+                  <CheckCircle :size="24" />
+                </div>
+                <h4>Мгновенная проверка</h4>
+                <p>Работодатель может проверить подлинность диплома за 2 секунды без звонков в вуз.</p>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- ===== Последние верификации ===== -->
-      <section class="dashboard__recent">
-        <div class="container">
-          <div class="dashboard__recent-head">
-            <p class="dashboard__how-eyebrow">Активность</p>
-            <h2 class="dashboard__how-title">Последние верификации</h2>
-          </div>
-
-          <div v-if="!recentVerifications.length" class="dashboard__empty-state">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <rect x="4" y="8" width="32" height="24" rx="4" stroke="currentColor" stroke-width="2"/>
-              <path d="M13 18h14M13 23h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <p>Ваш диплом ещё не проверяли</p>
-          </div>
-
-          <div v-else class="dashboard__recent-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  <th>Кем проверен</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in recentVerifications" :key="item.id">
-                  <td>{{ item.date }}</td>
-                  <td>{{ item.checker }}</td>
-                  <td>
-                    <span class="status-badge" :class="'status-' + item.status">
-                      {{ item.status === 'active' ? 'Успешно' : 'Неизвестно' }}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              <div class="info-card">
+                <div class="sidebar-icon-wrap bg-purple">
+                  <FileSearch :size="24" />
+                </div>
+                <h4>История проверок</h4>
+                <p>Отслеживайте кто и когда проверял ваши дипломы в режиме реального времени.</p>
+              </div>
+            </aside>
           </div>
         </div>
       </section>
@@ -227,6 +172,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import {
+  Search, User, CheckCircle, AlertCircle, Building2, GraduationCap,
+  Calendar, ShieldCheck, FileSearch, Loader2
+} from 'lucide-vue-next'
 import AppFooter from '../../components/common/AppFooter.vue'
 import StatusBadge from '../../components/common/StatusBadge.vue'
 
@@ -441,15 +390,14 @@ onMounted(() => {
   margin: 0;
 }
 
-/* ---- Buttons (как на diplomas) ---- */
-.diplomas__hero-actions {
+.dashboard__hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: center;
 }
 
-.diplomas__btn {
+.dashboard__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -464,215 +412,111 @@ onMounted(() => {
   border: 2px solid transparent;
 }
 
-.diplomas__btn--outline {
+.dashboard__btn--outline {
   background: transparent;
   color: #fff;
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-.diplomas__btn--outline:hover {
+.dashboard__btn--outline:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.dashboard__examples {
+/* ===========================
+   Info Banner
+   =========================== */
+.info-banner {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: #e8f4fd;
+  border: 1px solid #b8dff5;
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
+  align-items: flex-start;
+}
+
+.banner-icon-bg {
+  background: #b8dff5;
+  border-radius: 50%;
+  padding: 8px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  max-width: 640px;
+  justify-content: center;
 }
 
-.dashboard__examples-label {
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.4);
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.banner-icon {
+  color: #1a5b8c;
 }
 
-.dashboard__examples-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.banner-text h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: #1a5b8c;
+  margin: 0 0 var(--space-1);
 }
 
-.dashboard__example-btn {
-  padding: 4px 12px;
-  font-family: var(--font-family);
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.dashboard__example-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+.banner-text p {
+  font-size: var(--font-size-sm);
+  color: #2d7ab5;
+  margin: 0;
+  line-height: 1.5;
 }
 
 /* ===========================
-   WORKSPACE
+   WORKSPACE / Dashboard Layout
    =========================== */
 .dashboard__workspace {
-  padding: 80px 0;
-  background: #f1f5f9;
+  padding: 40px 0 80px;
+  background: #f8fafc;
   overflow-x: hidden;
 }
 
-.dashboard__workspace-head {
-  text-align: center;
-  margin-bottom: var(--space-10);
-}
-
-.dashboard__workspace-eyebrow {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-main-blue);
-  margin-bottom: var(--space-2);
-}
-
-.dashboard__workspace-title {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-black);
-  line-height: 1.2;
-}
-
-.dashboard__workspace-grid {
+.dashboard-layout {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr 320px;
   gap: var(--space-6);
   align-items: start;
 }
 
-/* --- Левая панель --- */
-.dashboard__workspace-panel {
+/* Section Pro */
+.section-pro {
   background: #fff;
-  border: 1px solid var(--color-gray-blue);
   border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.dashboard__panel-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6);
-  background: #0d1f3c;
-  border-bottom: 3px solid var(--color-main-blue);
-}
-
-.dashboard__panel-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--color-sea-clear);
-  flex-shrink: 0;
-}
-
-.dashboard__panel-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.dashboard__panel-title-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dashboard__panel-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: #fff;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.dashboard__panel-desc {
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
-
-.dashboard__search-card {
+  border: 1px solid var(--color-gray-blue);
   padding: var(--space-6);
 }
 
-/* --- Правая колонка (сайдбар) --- */
-.dashboard__workspace-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.dashboard__sidebar-card {
-  background: #fff;
-  border: 1px solid var(--color-gray-blue);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.dashboard__sidebar-card--accent {
-  border-left: 3px solid var(--color-main-blue);
-}
-
-.dashboard__sidebar-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-black);
-  margin: 0 0 var(--space-4);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.dashboard__sidebar-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.dashboard__sidebar-btn {
+.section-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-pale-black);
-  background: var(--color-pale-blue);
-  border-radius: var(--radius-base);
-  text-decoration: none;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
 }
 
-.dashboard__sidebar-btn svg {
-  flex-shrink: 0;
-  color: var(--color-main-blue);
-}
-
-.dashboard__sidebar-btn:hover {
-  background: #dde5f0;
-  color: var(--color-main-blue);
-}
-
-.dashboard__sidebar-hint {
-  font-size: var(--font-size-sm);
-  color: var(--color-pale-black);
-  line-height: 1.6;
+.section-header h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
   margin: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Search Card */
+.dashboard__search-card {
+  /* Already inside section-pro */
 }
 
 /* ===========================
@@ -699,9 +543,22 @@ onMounted(() => {
   letter-spacing: 0.01em;
 }
 
+.sf-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sf-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-pale-black);
+  pointer-events: none;
+}
+
 .sf-input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 10px 14px 10px 38px;
   border: 1px solid var(--color-gray-blue);
   border-radius: var(--radius-base);
   font-size: var(--font-size-base);
@@ -722,7 +579,7 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(38, 75, 130, 0.1);
 }
 
-/* --- Suggestions / Autocomplete --- */
+/* Suggestions / Autocomplete */
 .sf-suggestions {
   position: absolute;
   top: 100%;
@@ -765,13 +622,13 @@ onMounted(() => {
   color: var(--color-main-blue);
 }
 
-/* ---- Button ---- */
+/* Button */
 .sf-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 24px;
+  padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
   font-family: var(--font-family);
@@ -796,9 +653,14 @@ onMounted(() => {
 
 .sf-spin {
   flex-shrink: 0;
+  animation: spin 0.8s linear infinite;
 }
 
-/* ---- Result ---- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Result */
 .sf-res {
   border: 1px solid;
   border-radius: var(--radius-lg);
@@ -828,14 +690,18 @@ onMounted(() => {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
-  color: #94a3b8;
 }
 
 .sf-res-icon--ok {
   background: #dcfce7;
   color: #16a34a;
+}
+
+.sf-res-icon:not(.sf-res-icon--ok) {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .sf-res-title {
@@ -845,23 +711,39 @@ onMounted(() => {
   color: var(--color-black);
 }
 
-.sf-res-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 16px;
-  font-size: 13px;
+.sf-res-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.sf-res-k {
+.sf-detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: #f8fafc;
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-sm);
+}
+
+.sf-detail-icon {
+  flex-shrink: 0;
+  color: var(--color-main-blue);
+}
+
+.sf-detail-k {
   color: var(--color-pale-black);
   font-weight: 500;
+  min-width: 100px;
 }
 
-.sf-res-v {
+.sf-detail-v {
   color: var(--color-black);
+  font-weight: var(--font-weight-semibold);
 }
 
-/* ---- Error ---- */
+/* Error */
 .sf-err {
   display: flex;
   align-items: center;
@@ -879,7 +761,7 @@ onMounted(() => {
   color: #dc2626;
 }
 
-/* ---- Transition ---- */
+/* Transition */
 .sf-fade-enter-active,
 .sf-fade-leave-active {
   transition: opacity 0.25s ease;
@@ -891,15 +773,70 @@ onMounted(() => {
 }
 
 /* ===========================
-   RECENT
+   Info Sidebar
+   =========================== */
+.info-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.info-card {
+  background: #fff;
+  border: 1px solid var(--color-gray-blue);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.info-card h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
+  margin: 0;
+}
+
+.info-card p {
+  font-size: var(--font-size-sm);
+  color: var(--color-pale-black);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sidebar-icon-wrap {
+  padding: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-icon-wrap svg {
+  color: #fff;
+}
+
+.bg-green { background: #22c55e; }
+.bg-blue { background: var(--color-main-blue); }
+.bg-purple { background: #a855f7; }
+.bg-orange { background: #f97316; }
+
+/* ===========================
+   Recent Verifications
    =========================== */
 .dashboard__recent {
   padding: 80px 0;
-  background: #fff;
+  background: #f8fafc;
   overflow-x: hidden;
 }
 
-.dashboard__recent-head { text-align: center; margin-bottom: var(--space-8); }
+.dashboard__recent-head {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
 
 .dashboard__how-eyebrow {
   font-size: var(--font-size-xs);
@@ -917,121 +854,144 @@ onMounted(() => {
   line-height: 1.2;
 }
 
+/* Empty State */
 .dashboard__empty-state {
-  padding: 3rem;
-  text-align: center;
-  color: #94a3b8;
-  background: #fff;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-gray-blue);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-8);
+  background: #fff;
+  border: 1px solid var(--color-gray-blue);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--color-pale-black);
+  font-size: var(--font-size-base);
 }
 
-.dashboard__empty-state svg {
-  opacity: 0.4;
+.empty-icon-bg {
+  width: 64px;
+  height: 64px;
+  background: #e8f4fd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-main-blue);
 }
 
-.dashboard__empty-state p {
-  margin: 0;
-  font-size: var(--font-size-sm);
-}
-
-.dashboard__recent-table {
+/* Recent Table Card */
+.recent-table-card {
   background: #fff;
   border: 1px solid var(--color-gray-blue);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-.dashboard__recent-table table {
+.recent-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  background: #e8f4fd;
+  border-bottom: 1px solid #b8dff5;
+}
+
+.recent-table-head h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: #1a5b8c;
+  margin: 0;
+}
+
+.recent-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.dashboard__recent-table thead {
-  background: var(--color-pale-blue);
-}
-
-.dashboard__recent-table th {
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-main-blue);
+.recent-table thead th {
+  padding: var(--space-3) var(--space-5);
   text-align: left;
-}
-
-.dashboard__recent-table td {
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--font-size-sm);
-  color: var(--color-black);
-  border-top: 1px solid var(--color-gray-blue);
-}
-
-.dashboard__recent-table tbody tr:hover {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-pale-black);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-gray-blue);
+  display: flex;
+  align-items: center;
+  gap: 4px;
   background: #f8fafc;
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 2px 10px;
+.recent-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.recent-table tbody tr:hover {
+  background: #f1f5f9;
+}
+
+.recent-table tbody td {
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--font-size-sm);
+  color: var(--color-black);
+  border-bottom: 1px solid var(--color-gray-blue);
+}
+
+.recent-table tbody td.mono {
+  font-family: monospace;
+  font-weight: var(--font-weight-semibold);
+}
+
+.recent-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Status Pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
-.status-active {
-  background: #e6f5ee;
-  color: #16a34a;
+.status-pill.status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-dot-active {
+  background: #22c55e;
 }
 
 /* ===========================
    АДАПТИВ
    =========================== */
 @media (max-width: 1100px) {
-  .dashboard__workspace-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard__workspace-sidebar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
+  .dashboard-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
   .dashboard__hero { padding: 44px 0 48px; }
   .dashboard__title { font-size: clamp(1.5rem, 6vw, 2.2rem); }
-  .dashboard__subtitle { font-size: var(--font-size-sm); }
-  .dashboard__examples { flex-direction: column; align-items: flex-start; }
-
-  .dashboard__workspace,
-  .dashboard__recent { padding: 48px 0; }
-
-  .dashboard__workspace-title { font-size: var(--font-size-2xl); }
-  .dashboard__workspace-head { margin-bottom: var(--space-8); }
-
-  .dashboard__search-card { padding: var(--space-4); }
-
-  .dashboard__panel-header { padding: var(--space-4); }
-
-  .dashboard__workspace-sidebar {
-    grid-template-columns: 1fr;
-  }
-
+  .dashboard__workspace, .dashboard__recent { padding: 48px 0; }
   .dashboard__how-title { font-size: var(--font-size-2xl); }
-  .dashboard__recent-head { margin-bottom: var(--space-6); }
-  .dashboard__recent-table { overflow-x: auto; }
 }
 
 @media (max-width: 540px) {
   .dashboard__hero { padding: 32px 0 40px; }
   .dashboard__title { font-size: 1.5rem; line-height: 1.2; }
-  .dashboard__subtitle { font-size: var(--font-size-sm); }
-
-  .dashboard__workspace-title { font-size: var(--font-size-xl); }
+  .dashboard__how-title { font-size: var(--font-size-xl); }
+  .recent-table-head { flex-direction: column; gap: var(--space-2); align-items: flex-start; }
 }
 </style>
