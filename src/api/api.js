@@ -1,229 +1,249 @@
-const BASE_URL = import.meta.env.DEV
-  ? ""
-  : import.meta.env.VITE_API_BASE_URL || "";
+const rawApiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+/** Явно включить прокси Vite в dev (иначе при заданном URL запросы идут в бэкенд напрямую — меньше 502/socket hang up) */
+const useViteProxyInDev =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_DEV_PROXY === 'true' &&
+  !!rawApiBase
+
+let BASE_URL = rawApiBase
+if (import.meta.env.DEV) {
+  BASE_URL = useViteProxyInDev ? '' : rawApiBase
+}
+
+if (!BASE_URL && import.meta.env.PROD) {
+  console.warn(
+    '[api] VITE_API_BASE_URL не задан — в production запросы пойдут на тот же origin (нужен прокси или env).'
+  )
+}
+
+function parseBody(text) {
+  if (text == null || !String(text).trim()) return {}
+  const t = String(text).trim()
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try {
+      return JSON.parse(text)
+    } catch {
+      return { detail: t.slice(0, 600) }
+    }
+  }
+  return { detail: t.slice(0, 600) }
+}
+
+function formatValidationErrors(errors) {
+  if (!errors || typeof errors !== 'object') return ''
+  return Object.entries(errors)
+    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+    .join('; ')
+}
+
+function pickErrorMessage(payload, status) {
+  if (status === 502 || status === 504) {
+    return (
+      (payload && typeof payload === 'object' && (payload.detail || payload.message)) ||
+      'Сервер недоступен (502). Проверьте бэкенд, VPN/Tailscale или отключите прокси: не задавайте VITE_DEV_PROXY, запросы пойдут напрямую на VITE_API_BASE_URL.'
+    )
+  }
+  if (status >= 500) {
+    const parts = [
+      payload.detail,
+      payload.message,
+      payload.title,
+      formatValidationErrors(payload.errors),
+    ].filter(Boolean)
+    const msg = parts.join('. ').trim()
+    return (
+      msg ||
+      `Ошибка сервера (${status}). Частые причины: неверный код ВУЗа относительно JWT, студент не из вашей БД, сбой подписи на бэкенде. Смотрите логи Spring и тело ответа в Network.`
+    )
+  }
+  if (!payload || typeof payload !== 'object') return `HTTP ${status}`
+  const val = formatValidationErrors(payload.errors)
+  const base =
+    payload.detail ||
+    payload.message ||
+    payload.title ||
+    payload.error ||
+    `HTTP ${status}`
+  return val ? `${base} (${val})` : base
+}
 
 /**
  * Универсальный запрос JSON
+ * — Content-Type только при теле (GET без лишнего заголовка)
+ * — Сетевые сбои fetch → понятная ошибка
  */
 async function request(method, path, { body, token, params } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const headers = { Accept: 'application/json, application/problem+json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-  // Собираем query params
-  let url = `${BASE_URL}${path}`;
+  let url = `${BASE_URL}${path}`
   if (params) {
-    const query = new URLSearchParams();
+    const query = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) query.append(k, String(v));
-    });
-    const qs = query.toString();
-    if (qs) url += `?${qs}`;
+      if (v !== undefined && v !== null && v !== '') query.append(k, String(v))
+    })
+    const qs = query.toString()
+    if (qs) url += `?${qs}`
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch (e) {
+    const isFetch =
+      e instanceof TypeError &&
+      (String(e.message).includes('fetch') || String(e.message).includes('Failed to fetch'))
+    const msg = isFetch
+      ? 'Нет связи с сервером: проверьте VITE_API_BASE_URL, VPN/Tailscale и CORS на бэкенде для origin фронтенда.'
+      : e.message || 'Ошибка сети'
+    const err = new Error(msg)
+    err.cause = e
+    throw err
+  }
+
+  const text = await res.text()
 
   if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    const err = new Error(payload.detail || `HTTP ${res.status}`);
-    err.status = res.status;
-    err.errors = payload.errors || null;
-    throw err;
+    const payload = parseBody(text)
+    const err = new Error(pickErrorMessage(payload, res.status))
+    err.status = res.status
+    err.errors = payload.errors || null
+    err.detail = payload.detail || payload.message || null
+    err.responseBody = payload
+    throw err
   }
 
-  // 204 No Content
-  if (res.status === 204) return null;
+  if (res.status === 204) return null
+  if (!text || !String(text).trim()) return null
 
-  return res.json();
+  const t = String(text).trim()
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try {
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
+  return null
 }
 
-/**
- * Загрузка файла (multipart/form-data)
- */
-async function uploadFile(method, path, { file, token, params } = {}) {
-  const headers = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  let url = `${BASE_URL}${path}`;
-  if (params) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) query.append(k, String(v));
-    });
-    const qs = query.toString();
-    if (qs) url += `?${qs}`;
-  }
-
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    const err = new Error(payload.detail || `HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-
-  return res.json();
-}
-
-/**
- * Запрос blob (скачивание файла)
- */
-async function requestBlob(method, path, { body, token } = {}) {
-  const headers = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
-    const err = new Error(payload.detail || `HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-
-  const filename = (res.headers.get("content-disposition") || "")
-    .match(/filename="?([^"]+)"?/)?.[1] || "document.docx";
-  const blob = await res.blob();
-  return { blob, filename };
+async function uploadFileDisabled() {
+  throw new Error(
+    'Загрузка файлов на сервер не описана в OpenAPI бэкенда. Используйте CSV и выпуск через POST /api/certificates.'
+  )
 }
 
 export const api = {
   // ===================== AUTH =====================
 
-  /** POST /api/v1/auth/register */
-  register: (data) =>
-    request("POST", "/api/v1/auth/register", { body: data }),
+  login: (data) => request('POST', '/api/auth/login', { body: data }),
 
-  /** POST /api/v1/auth/login */
-  login: (data) =>
-    request("POST", "/api/v1/auth/login", { body: data }),
+  registerUniversity: (data) =>
+    request('POST', '/api/auth/register/university', { body: data }),
 
-  /** POST /api/v1/auth/refresh */
-  refresh: (refresh_token) =>
-    request("POST", "/api/v1/auth/refresh", { body: { refresh_token } }),
+  registerStudent: (data) =>
+    request('POST', '/api/auth/register/student', { body: data }),
 
-  /** POST /api/v1/auth/logout */
-  logout: (refresh_token, access_token) =>
-    request("POST", "/api/v1/auth/logout", {
-      body: { refresh_token },
-      token: access_token,
-    }),
+  registerEmployer: (data) =>
+    request('POST', '/api/auth/register/employer', { body: data }),
 
-  // ===================== DIPLOMAS =====================
+  // ===================== CERTIFICATES =====================
 
-  /** GET /api/v1/diplomas */
-  getDiplomas: (params, token) =>
-    request("GET", "/api/v1/diplomas", { params, token }),
+  issueCertificate: (data, token) =>
+    request('POST', '/api/certificates', { body: data, token }),
 
-  /** GET /api/v1/diplomas/:id */
-  getDiploma: (id, token) =>
-    request("GET", `/api/v1/diplomas/${id}`, { token }),
+  /** GET /api/certificates/my — список дипломов студента (массив) */
+  getMyCertificates: (token) => request('GET', '/api/certificates/my', { token }),
 
-  /** POST /api/v1/diplomas */
-  createDiploma: (data, token) =>
-    request("POST", "/api/v1/diplomas", { body: data, token }),
+  /** GET /api/certificates/my/{certificateId} */
+  getMyCertificateById: (certificateId, token) =>
+    request('GET', `/api/certificates/my/${encodeURIComponent(certificateId)}`, { token }),
 
-  /** PATCH /api/v1/diplomas/:id */
-  updateDiploma: (id, data, token) =>
-    request("PATCH", `/api/v1/diplomas/${id}`, { body: data, token }),
+  // ===================== QR =====================
 
-  /** DELETE /api/v1/diplomas/:id */
-  deleteDiploma: (id, token) =>
-    request("DELETE", `/api/v1/diplomas/${id}`, { token }),
+  generateCertificateQr: (certificateId, token) =>
+    request('POST', `/api/qr/certificates/${encodeURIComponent(certificateId)}`, { token }),
 
-  // ===================== VERIFY =====================
+  // ===================== CRYPTO (TEST) =====================
 
-  /** GET /api/v1/verify?serial=...&hash=... */
-  verify: (params, token) =>
-    request("GET", "/api/v1/verify", { params, token }),
+  cryptoVerify: (params, token) =>
+    request('GET', '/api/test/crypto/verify', { params, token }),
 
-  /** POST /api/v1/verify/bulk */
-  verifyBulk: (serials, token) =>
-    request("POST", "/api/v1/verify/bulk", { body: { serials }, token }),
+  cryptoSign: (params, token) =>
+    request('GET', '/api/test/crypto/sign', { params, token }),
 
-  /** GET /api/v1/verify/share/:token */
-  verifyShare: (token) =>
-    request("GET", `/api/v1/verify/share/${token}`),
+  /**
+   * Публичная верификация — работает БЕЗ токена.
+   * Параметры: certificateId, token (query).
+   */
+  publicVerifyQuery: (params) =>
+    request('GET', '/api/public/verify', { params }),
 
-  // ===================== PUBLIC VERIFY =====================
+  // ===================== Совместимость / заглушки =====================
 
-  /** GET /api/v1/public/verify/:token */
-  publicVerify: (token) =>
-    request("GET", `/api/v1/public/verify/${token}`),
+  register: () => {
+    throw new Error('Используйте registerUniversity / registerStudent / registerEmployer')
+  },
 
-  // ===================== UPLOADS =====================
+  refresh: () => {
+    throw new Error('Бэкенд не выдаёт refresh_token; войдите снова')
+  },
 
-  /** POST /api/v1/uploads */
-  uploadFile: (file, token) =>
-    uploadFile("POST", "/api/v1/uploads", { file, token }),
+  logout: async () => null,
 
-  /** GET /api/v1/uploads */
-  getUploads: (token) =>
-    request("GET", "/api/v1/uploads", { token }),
+  /** У ВУЗа в OpenAPI нет списка всех дипломов — только локальный кэш на фронте */
+  getDiplomas: async () => ({ data: [], total: 0 }),
 
-  // ===================== API KEYS =====================
+  getDiploma: (id, token) => api.getMyCertificateById(id, token),
 
-  /** POST /api/v1/api-keys */
-  createApiKey: (token) =>
-    request("POST", "/api/v1/api-keys", { token }),
+  createDiploma: (data, token) => api.issueCertificate(data, token),
 
-  /** DELETE /api/v1/api-keys */
-  deleteApiKey: (token) =>
-    request("DELETE", "/api/v1/api-keys", { token }),
+  updateDiploma: async () => {
+    throw new Error('PATCH диплома не поддерживается API')
+  },
 
-  /** GET /api/v1/api-keys/usage */
-  getApiKeyUsage: (token) =>
-    request("GET", "/api/v1/api-keys/usage", { token }),
+  deleteDiploma: async () => {
+    throw new Error('DELETE диплома не поддерживается API')
+  },
 
-  // ===================== SETTINGS =====================
+  verify: async () => {
+    throw new Error('Используйте cryptoVerify или локальный поиск по номеру')
+  },
 
-  /** GET /api/v1/settings */
-  getSettings: (token) =>
-    request("GET", "/api/v1/settings", { token }),
+  verifyBulk: async () => {
+    throw new Error('Массовая проверка не описана в OpenAPI')
+  },
 
-  /** PUT /api/v1/settings */
-  updateSettings: (data, token) =>
-    request("PUT", "/api/v1/settings", { body: data, token }),
+  verifyShare: (token, certificateId) =>
+    api.publicVerifyQuery({ token, certificateId }),
 
-  // ===================== STATS =====================
+  publicVerify: (token, certificateId) =>
+    api.publicVerifyQuery({ token, certificateId }),
 
-  /** GET /api/v1/stats */
-  getStats: (token) =>
-    request("GET", "/api/v1/stats", { token }),
+  uploadFile: () => uploadFileDisabled(),
 
-  // ===================== SHARE TOKENS =====================
+  getUploads: async () => [],
 
-  /** POST /api/v1/share-tokens */
-  createShareToken: (data, token) =>
-    request("POST", "/api/v1/share-tokens", { body: data, token }),
+  createApiKey: async () => ({}),
+  deleteApiKey: async () => null,
+  getApiKeyUsage: async () => ({}),
 
-  /** GET /api/v1/share-tokens */
-  getShareTokens: (token) =>
-    request("GET", "/api/v1/share-tokens", { token }),
+  getSettings: async () => ({}),
+  updateSettings: async () => ({}),
 
-  /** DELETE /api/v1/share-tokens/:token */
-  deleteShareToken: (shareToken, token) =>
-    request("DELETE", `/api/v1/share-tokens/${shareToken}`, { token }),
+  getStats: async () => ({}),
 
-  // ===================== VERIFICATION LOG =====================
+  createShareToken: async () => {
+    throw new Error('Share-токены не описаны в OpenAPI. Используйте POST /api/qr/certificates/{id}')
+  },
+  getShareTokens: async () => [],
+  deleteShareToken: async () => null,
 
-  /** GET /api/v1/verification-log */
-  getVerificationLog: (params, token) =>
-    request("GET", "/api/v1/verification-log", { params, token }),
-};
+  getVerificationLog: async () => ({ data: [], total: 0 }),
+}

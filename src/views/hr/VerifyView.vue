@@ -23,7 +23,6 @@
             </p>
 
             <div class="verify__hero-actions">
-              <router-link to="/hr/bulk" class="verify__btn verify__btn--outline">Массовая проверка</router-link>
               <router-link to="/hr/reports" class="verify__btn verify__btn--outline">Отчёты</router-link>
             </div>
 
@@ -42,37 +41,24 @@
       <!-- ===== Основная рабочая зона ===== -->
       <section class="verify__workspace">
         <div class="container">
-          <div class="verify__workspace-head">
-            <p class="verify__workspace-eyebrow">Проверка подлинности</p>
-            <h2 class="verify__workspace-title">Введите данные диплома</h2>
-          </div>
-
-          <div class="verify__workspace-grid">
+          <div class="dashboard-layout">
             <!-- Левая колонка: форма проверки -->
-            <div class="verify__workspace-panel">
-              <div class="verify__panel-header">
-                <div class="verify__panel-icon">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M12 12l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  </svg>
-                </div>
-                <div class="verify__panel-title-wrap">
-                  <h3 class="verify__panel-title">Верификация</h3>
-                  <p class="verify__panel-desc">Поиск по серийному номеру или хэшу</p>
-                </div>
+            <section class="section-pro">
+              <div class="section-header">
+                <h2>Верификация диплома</h2>
+                <span class="badge">Онлайн</span>
               </div>
 
               <div class="verify__checker-card">
                 <VerificationForm @verify="onVerify" @error="onError" />
               </div>
-            </div>
+            </section>
 
-            <!-- Правая колонка: QR + инструкции -->
-            <div class="verify__workspace-sidebar">
+            <!-- Правая колонка: сайдбар -->
+            <aside class="info-sidebar">
               <!-- QR-карточка -->
-              <div class="verify__sidebar-card">
-                <h4 class="verify__sidebar-title">QR-сканер</h4>
+              <div class="info-card">
+                <h4>QR-сканер</h4>
                 <div class="verify__qr-scanner">
                 <!-- Режим выбора: камера или файл -->
                 <div v-if="!scanMode" class="verify__qr-mode-selector">
@@ -92,7 +78,6 @@
                     @change="handleFileUpload"
                   />
                 </div>
-
                 <!-- Камера -->
                 <div v-else-if="scanMode === 'camera'" class="verify__qr-camera">
                   <div id="qr-reader" ref="qrReaderContainerRef" class="verify__qr-reader" />
@@ -112,6 +97,7 @@
                 <div v-else class="verify__qr-placeholder">
                   <Camera size="48" :stroke-width="1.5" />
                   <span>Наведите камеру на QR-код</span>
+                </div>
                 </div>
               </div>
 
@@ -157,21 +143,11 @@
                   </div>
                 </div>
               </div>
-              </div>
 
               <!-- Быстрые действия -->
               <div class="verify__sidebar-card verify__sidebar-card--accent">
                 <h4 class="verify__sidebar-title">Быстрые действия</h4>
                 <div class="verify__sidebar-actions">
-                  <router-link to="/hr/bulk" class="verify__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                      <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/>
-                    </svg>
-                    Массовая проверка
-                  </router-link>
                   <router-link to="/hr/reports" class="verify__sidebar-btn">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                       <rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
@@ -188,7 +164,7 @@
                   </router-link>
                 </div>
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       </section>
@@ -201,44 +177,32 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
-import { Camera, Upload, X, CheckCircle, AlertCircle, History } from 'lucide-vue-next'
+import { Camera, Upload, X, CheckCircle, AlertCircle, History, ShieldCheck } from 'lucide-vue-next'
 import AppFooter from '../../components/common/AppFooter.vue'
 import VerificationForm from '../../components/hr/VerificationForm.vue'
+import { api } from '../../api/api.js'
+import { findCertificateById } from '../../utils/certificatesStore.js'
+import { useAuth } from '../../composables/useAuth.js'
 
-// База данных дипломов (временная)
-const DIPLOMAS_DB = {
-  '1': { 
-    id: '1', 
-    studentName: 'Иванов Иван Иванович', 
-    degree: 'Бакалавр',
-    number: 'DIP-2023-001', 
-    university: 'МГТУ им. Баумана', 
-    specialty: 'Информатика и ВТ', 
-    year: '2023', 
-    status: 'active',
-    issueDate: '20.06.2023'
-  },
-  '2': { 
-    id: '2', 
-    studentName: 'Иванов Иван Иванович', 
-    degree: 'Магистр',
-    number: 'DIP-2024-789', 
-    university: 'Финансовый университет', 
-    specialty: 'Экономика', 
-    year: '2024', 
-    status: 'active',
-    issueDate: '15.06.2024'
-  },
-  '3': { 
-    id: '3', 
-    studentName: 'Петров Петр Петрович', 
-    degree: 'Бакалавр',
-    number: 'DIP-2021-555', 
-    university: 'МГУ им. Ломоносова', 
-    specialty: 'Физика', 
-    year: '2021', 
-    status: 'revoked',
-    issueDate: '01.07.2021'
+const { accessToken } = useAuth()
+
+function formatIssueDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toLocaleDateString('ru-RU')
+}
+
+function certToScanResult(cert) {
+  return {
+    studentName: cert.studentName,
+    degree: 'Диплом',
+    number: cert.serialNumber,
+    university: cert.universityCode || '—',
+    specialty: cert.specialty,
+    year: String(cert.graduationYear || ''),
+    status: cert.status,
+    issueDate: formatIssueDate(cert.issueDate),
   }
 }
 
@@ -395,47 +359,113 @@ const onScanFailure = (error) => {
   // Тихо игнорируем ошибки сканирования
 }
 
-const processQRCode = (decodedText) => {
-  const match = decodedText.match(/check\/(\d+)/)
-  if (match) {
-    const diplomaId = match[1]
-    verifyDiploma(diplomaId)
-  } else {
-    error.value = 'Неверный формат QR-кода'
+const processQRCode = async (decodedText) => {
+  loading.value = true
+  error.value = ''
+  const t = String(decodedText || '').trim()
+
+  try {
+    const legacy = t.match(/check\/([^/?#]+)/)
+    if (legacy) {
+      await verifyDiploma(legacy[1])
+      return
+    }
+
+    let certificateId = ''
+    let token = ''
+    try {
+      const u = t.includes('://')
+        ? new URL(t)
+        : new URL(t.startsWith('/') ? t : `/${t}`, window.location.origin)
+      certificateId = u.searchParams.get('certificateId') || ''
+      token = u.searchParams.get('token') || ''
+    } catch {
+      /* ignore */
+    }
+
+    if (certificateId || token) {
+      const res = await api.publicVerifyQuery(
+        { certificateId, token }
+      )
+      scanResult.value = {
+        studentName: res?.fullName || res?.studentName || 'Проверка по API',
+        degree: 'Результат',
+        number: res?.diplomaNumber || certificateId || '—',
+        university: res?.universityCode || res?.universityName || '—',
+        specialty: res?.specialty || JSON.stringify(res || {}).slice(0, 120),
+        year: res?.graduationYear ? String(res.graduationYear) : '',
+        status: 'active',
+        issueDate: '—',
+        verified: true,
+        verifiedAt: new Date().toLocaleString('ru-RU'),
+        apiPayload: res,
+      }
+      pushHistory(scanResult.value)
+      await stopCameraScan()
+      return
+    }
+
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    if (uuidRe.test(t)) {
+      const cert = findCertificateById(t)
+      if (cert) {
+        const row = certToScanResult(cert)
+        scanResult.value = {
+          ...row,
+          verified: true,
+          verifiedAt: new Date().toLocaleString('ru-RU'),
+        }
+        pushHistory({ ...row, id: cert.id, verifiedAt: scanResult.value.verifiedAt })
+      } else {
+        scanResult.value = {
+          error: true,
+          message: 'Сертификат не найден в локальном кэше этого браузера',
+        }
+      }
+      await stopCameraScan()
+      return
+    }
+
+    error.value = 'Не удалось разобрать QR-код'
     scanMode.value = null
+  } catch (e) {
+    scanResult.value = {
+      error: true,
+      message: e.message || 'Ошибка проверки',
+    }
+    await stopCameraScan()
+  } finally {
+    loading.value = false
   }
 }
 
-const verifyDiploma = (id) => {
-  loading.value = true
-  
-  setTimeout(() => {
-    const diploma = DIPLOMAS_DB[id]
-    
-    if (diploma) {
-      scanResult.value = {
-        ...diploma,
-        verified: true,
-        verifiedAt: new Date().toLocaleString('ru-RU')
-      }
-      
-      const exists = scanHistory.value.find(item => item.id === id)
-      if (!exists) {
-        scanHistory.value = [
-          { ...diploma, verifiedAt: new Date().toLocaleString('ru-RU') }, 
-          ...scanHistory.value
-        ].slice(0, 10)
-      }
-    } else {
-      scanResult.value = {
-        error: true,
-        message: 'Диплом не найден в системе'
-      }
+function pushHistory(row) {
+  const id = row.id || row.number
+  const exists = scanHistory.value.find((item) => item.id === id || item.number === row.number)
+  if (!exists) {
+    scanHistory.value = [{ ...row, id }, ...scanHistory.value].slice(0, 10)
+  }
+}
+
+const verifyDiploma = async (id) => {
+  const cert = findCertificateById(id)
+  if (cert) {
+    const row = certToScanResult(cert)
+    scanResult.value = {
+      ...row,
+      verified: true,
+      verifiedAt: new Date().toLocaleString('ru-RU'),
     }
-    
-    stopCameraScan()
-    loading.value = false
-  }, 800)
+    pushHistory({ ...row, id: cert.id, verifiedAt: scanResult.value.verifiedAt })
+  } else {
+    scanResult.value = {
+      error: true,
+      message: 'Диплом не найден в локальном кэше',
+    }
+  }
+  await stopCameraScan()
+  loading.value = false
 }
 
 const clearResult = () => {
@@ -472,6 +502,125 @@ onUnmounted(() => {
 
 <style scoped>
 .verify-view { min-height: 100vh; }
+.main-content { flex: 1; }
+
+/* ===========================
+   Info Banner
+   =========================== */
+.info-banner {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: #e8f4fd;
+  border: 1px solid #b8dff5;
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
+  align-items: flex-start;
+}
+
+.banner-icon-bg {
+  background: #b8dff5;
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-icon {
+  color: #1a5b8c;
+}
+
+.banner-text h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: #1a5b8c;
+  margin: 0 0 var(--space-1);
+}
+
+.banner-text p {
+  font-size: var(--font-size-sm);
+  color: #2d7ab5;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ===========================
+   WORKSPACE / Dashboard Layout
+   =========================== */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Section Pro */
+.section-pro {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-gray-blue);
+  padding: var(--space-6);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.section-header h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
+  margin: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Info Sidebar */
+.info-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.info-card {
+  background: #fff;
+  border: 1px solid var(--color-gray-blue);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.info-card h4 {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-black);
+  margin: 0;
+}
+
+.info-card p {
+  font-size: var(--font-size-sm);
+  color: var(--color-pale-black);
+  margin: 0;
+  line-height: 1.5;
+}
 
 /* ===========================
    HERO
@@ -794,9 +943,8 @@ onUnmounted(() => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.verify__sidebar-card--accent {
-  border-left: 3px solid var(--color-main-blue);
-}
+
+
 
 .verify__sidebar-title {
   font-size: var(--font-size-sm);
@@ -1245,77 +1393,18 @@ onUnmounted(() => {
    АДАПТИВ
    =========================== */
 @media (max-width: 1100px) {
-  .verify__stats-inner { grid-template-columns: repeat(2, 1fr); }
-  .verify__stat:nth-child(2) { border-right: none; }
-  .verify__stat:nth-child(1), .verify__stat:nth-child(2) { border-bottom: 1px solid var(--color-gray-blue); }
-
-  .verify__workspace-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .verify__workspace-sidebar {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
+  .dashboard-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
   .verify__hero { padding: 44px 0 48px; }
   .verify__hero-title { font-size: clamp(1.5rem, 6vw, 2.2rem); }
-  .verify__hero-subtitle { font-size: var(--font-size-sm); }
-
-  .verify__stat {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    padding: var(--space-3) var(--space-4);
-  }
-  .verify__stat-value { font-size: var(--font-size-base); }
-  .verify__stat-note { display: none; }
-
-  .verify__steps { flex-direction: column; gap: var(--space-3); }
-  .verify__step { padding: var(--space-4); }
-  .verify__step::after { display: none; }
-
-  .verify__workspace,
-  .verify__features,
-  .verify__cta { padding: 48px 0; }
-
-  .verify__workspace-title { font-size: var(--font-size-2xl); }
-  .verify__workspace-head { margin-bottom: var(--space-8); }
-
-  .verify__checker-card { padding: var(--space-4); }
-
-  .verify__panel-header { padding: var(--space-4); }
-
-  .verify__workspace-sidebar {
-    grid-template-columns: 1fr;
-  }
-
-  .verify__features-title { font-size: var(--font-size-2xl); }
-  .verify__features-head { margin-bottom: var(--space-8); }
+  .verify__workspace { padding: 48px 0; }
+  .section-header h2 { font-size: var(--font-size-xl); }
 }
 
 @media (max-width: 540px) {
   .verify__hero { padding: 32px 0 40px; }
   .verify__hero-title { font-size: 1.5rem; line-height: 1.2; }
-  .verify__hero-subtitle { font-size: var(--font-size-sm); }
-  .verify__examples { flex-direction: column; align-items: flex-start; }
-
-  .verify__stats-inner { grid-template-columns: 1fr 1fr; }
-  .verify__stat {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: var(--space-3) var(--space-3);
-    gap: 2px;
-  }
-  .verify__stat:nth-child(1), .verify__stat:nth-child(3) { border-right: 1px solid var(--color-gray-blue); }
-  .verify__stat:nth-child(2), .verify__stat:nth-child(4) { border-right: none; }
-  .verify__stat-value { font-size: var(--font-size-base); white-space: normal; }
-  .verify__stat-label { font-size: 11px; }
-  .verify__stat-note { display: none; }
-
-  .verify__workspace-title { font-size: var(--font-size-xl); }
 }
 </style>

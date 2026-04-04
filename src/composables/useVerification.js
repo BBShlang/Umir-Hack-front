@@ -1,10 +1,10 @@
 /**
- * useVerification — проверка дипломов по серийному номеру, хешу, QR
- * Реальный API бэкенда ДиплоРеестр
+ * useVerification — криптопроверка (Swagger) + локальный поиск по номеру диплома
  */
 import { ref } from 'vue'
 import { api } from '../api/api.js'
 import { useAuth } from './useAuth.js'
+import { findCertificateByNumber } from '../utils/certificatesStore.js'
 
 const verifying = ref(false)
 const verificationResult = ref(null)
@@ -14,21 +14,17 @@ export function useVerification() {
   const { accessToken } = useAuth()
 
   /**
-   * Проверить диплом по серийному номеру или хешу
-   * @param {object} params — { serial?: string, hash?: string }
-   * @returns {Promise<object>}
+   * Проверка подписи (тестовый endpoint бэкенда)
    */
-  async function verify(params) {
-    if (!params.serial && !params.hash) {
-      throw new Error('Укажите серийномер или хеш')
-    }
-
+  async function verifyCrypto({ universityCode, payload, signature }) {
     verifying.value = true
     verificationError.value = null
     verificationResult.value = null
-
     try {
-      const res = await api.verify(params, accessToken.value)
+      const res = await api.cryptoVerify(
+        { universityCode, payload, signature },
+        accessToken.value
+      )
       verificationResult.value = res
       return res
     } catch (err) {
@@ -40,66 +36,74 @@ export function useVerification() {
   }
 
   /**
-   * Проверить диплом по серийному номеру
+   * По номеру диплома — ищем в локально сохранённых выпусках (тот же браузер)
    */
-  async function verifyBySerial(serialNumber) {
-    return verify({ serial: serialNumber })
-  }
-
-  /**
-   * Проверить диплом по хешу
-   */
-  async function verifyByHash(hash) {
-    return verify({ hash })
-  }
-
-  /**
-   * Массовая проверка дипломов
-   * @param {string[]} serials
-   * @returns {Promise<object[]>}
-   */
-  async function verifyBulk(serials) {
+  async function verifyByLocalSerial(serialNumber) {
     verifying.value = true
     verificationError.value = null
     verificationResult.value = null
-
     try {
-      const res = await api.verifyBulk(serials, accessToken.value)
-      verificationResult.value = res
-      return res
-    } catch (err) {
-      verificationError.value = err.message
-      throw err
-    } finally {
-      verifying.value = false
-    }
-  }
-
-  /**
-   * Проверить по QR-токену (публичная верификация)
-   * @param {string} token — share token
-   * @returns {Promise<object>}
-   */
-  async function verifyByQR(token) {
-    verifying.value = true
-    verificationError.value = null
-    verificationResult.value = null
-
-    try {
-      // Пробуем сначала публичный endpoint
-      const res = await api.publicVerify(token)
-      verificationResult.value = res
-      return res
-    } catch {
-      // Если не вышло — через share endpoint
-      try {
-        const res = await api.verifyShare(token)
-        verificationResult.value = res
-        return res
-      } catch (err2) {
-        verificationError.value = err2.message
-        throw err2
+      const cert = findCertificateByNumber(serialNumber)
+      if (!cert) {
+        const err = new Error('Диплом не найден в локальном кэше')
+        verificationError.value = err.message
+        throw err
       }
+      verificationResult.value = {
+        local: true,
+        certificate: cert,
+      }
+      return verificationResult.value
+    } finally {
+      verifying.value = false
+    }
+  }
+
+  async function verify(params) {
+    if (params.serial) return verifyByLocalSerial(params.serial)
+    throw new Error('Укажите номер диплома')
+  }
+
+  async function verifyBySerial(serialNumber) {
+    return verifyByLocalSerial(serialNumber)
+  }
+
+  async function verifyByHash() {
+    throw new Error('Проверка по хешу не реализована в текущем API')
+  }
+
+  async function verifyBulk() {
+    throw new Error('Массовая проверка не реализована в текущем API')
+  }
+
+  async function verifyByQR(tokenOrUrl) {
+    verifying.value = true
+    verificationError.value = null
+    verificationResult.value = null
+    try {
+      const t = String(tokenOrUrl || '').trim()
+      let certificateId = ''
+      let token = ''
+      try {
+        const u = t.includes('://')
+          ? new URL(t)
+          : new URL(t.startsWith('/') ? t : `/${t}`, window.location.origin)
+        certificateId = u.searchParams.get('certificateId') || ''
+        token = u.searchParams.get('token') || ''
+      } catch {
+        token = t
+      }
+
+      const params = {}
+      if (certificateId) params.certificateId = certificateId
+      if (token) params.token = token
+
+      const res = await api.publicVerifyQuery(params)
+      verificationResult.value = res
+      return res
+    } catch (err) {
+      verificationError.value = err.message
+      throw err
     } finally {
       verifying.value = false
     }
@@ -120,6 +124,8 @@ export function useVerification() {
     verifyByHash,
     verifyByQR,
     verifyBulk,
+    verifyCrypto,
+    verifyByLocalSerial,
     reset,
   }
 }

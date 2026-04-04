@@ -1,6 +1,5 @@
 <template>
   <div class="diplomas-list-view">
-    <AppHeader />
     <main class="main-content">
       <!-- ===== HERO ===== -->
       <section class="diplomas__hero">
@@ -40,6 +39,48 @@
         </div>
       </section>
 
+      <!-- ===== Выпуск диплома (API бэкенда) ===== -->
+      <section class="diplomas__issue-section">
+        <div class="container">
+          <div class="diplomas__table-head">
+            <p class="diplomas__how-eyebrow">Выпуск</p>
+            <h2 class="diplomas__how-title">Новый диплом</h2>
+          </div>
+          <form class="issue-form" @submit.prevent="onIssueSubmit">
+            <div class="issue-form__grid">
+              <label class="issue-form__field">
+                <span>Код университета</span>
+                <input v-model="issueForm.universityCode" type="text" required placeholder="AITU-01" />
+              </label>
+              <label class="issue-form__field">
+                <span>UUID студента</span>
+                <input v-model="issueForm.studentId" type="text" required placeholder="ed97654b-7963-4ef2-97af-99fc78753d5a" />
+              </label>
+              <label class="issue-form__field">
+                <span>Номер диплома</span>
+                <input v-model="issueForm.diplomaNumber" type="text" required placeholder="DIP-2026-001" />
+              </label>
+              <label class="issue-form__field">
+                <span>ФИО выпускника</span>
+                <input v-model="issueForm.fullName" type="text" required />
+              </label>
+              <label class="issue-form__field">
+                <span>Специальность</span>
+                <input v-model="issueForm.specialty" type="text" required />
+              </label>
+              <label class="issue-form__field">
+                <span>Год выпуска</span>
+                <input v-model.number="issueForm.graduationYear" type="number" required min="1950" max="2100" />
+              </label>
+            </div>
+            <p v-if="issueError" class="issue-form__err">{{ issueError }}</p>
+            <p v-if="issueOk" class="issue-form__ok">{{ issueOk }}</p>
+            <button type="submit" class="diplomas__btn diplomas__btn--primary" :disabled="issueLoading">
+              {{ issueLoading ? 'Выпуск…' : 'Выпустить диплом' }}
+            </button>
+          </form>
+        </div>
+      </section>
 
       <!-- ===== Таблица дипломов ===== -->
       <section class="diplomas__table-section">
@@ -84,7 +125,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import DataTable from '../../components/common/DataTable.vue'
 import SearchInput from '../../components/common/SearchInput.vue'
@@ -93,13 +134,52 @@ import ModalDialog from '../../components/common/ModalDialog.vue'
 import DiplomaActions from '../../components/university/DiplomaActions.vue'
 import RevokeConfirm from '../../components/university/RevokeConfirm.vue'
 import { useDiplomas } from '../../composables/useDiplomas.js'
+import { useAuth } from '../../composables/useAuth.js'
 
-const { diplomas, loading, fetchDiplomas, setSearch, setStatusFilter, revokeDiploma, setPage } = useDiplomas()
+const { user } = useAuth()
+const {
+  diplomas,
+  loading,
+  total,
+  page,
+  pageSize,
+  fetchDiplomas,
+  createDiploma,
+  setSearch,
+  setStatusFilter,
+  revokeDiploma,
+  setPage,
+} = useDiplomas()
 
 const searchQuery = ref('')
 const statusFilter = ref('all')
 const revokingDiploma = ref(null)
-const pagination = ref({ page: 1, pageSize: 10, total: 0 })
+
+const pagination = computed(() => ({
+  page: page.value,
+  pageSize: pageSize.value,
+  total: total.value,
+}))
+
+const issueForm = ref({
+  universityCode: user.value?.universityCode || '',
+  studentId: '',
+  diplomaNumber: '',
+  fullName: '',
+  specialty: '',
+  graduationYear: new Date().getFullYear(),
+})
+const issueLoading = ref(false)
+const issueError = ref('')
+const issueOk = ref('')
+
+watch(
+  () => user.value?.universityCode,
+  (code) => {
+    if (code && !issueForm.value.universityCode) issueForm.value.universityCode = code
+  },
+  { immediate: true }
+)
 
 const columns = [
   { key: 'serialNumber', label: 'Серийный номер', sortable: true },
@@ -111,31 +191,43 @@ const columns = [
   { key: 'actions', label: 'Действия' }
 ]
 
-const activeCount = computed(() => diplomas.value.filter(d => d.status === 'active').length)
-const revokedCount = computed(() => diplomas.value.filter(d => d.status === 'revoked').length)
-const pendingCount = computed(() => diplomas.value.filter(d => d.status === 'pending').length)
-
 onMounted(() => {
-  fetchDiplomas().then(() => {
-    pagination.value.total = diplomas.value.length
-  })
+  fetchDiplomas()
 })
+
+async function onIssueSubmit() {
+  issueError.value = ''
+  issueOk.value = ''
+  issueLoading.value = true
+  try {
+    await createDiploma({ ...issueForm.value })
+    issueOk.value = 'Диплом выпущен и добавлен в локальный реестр.'
+    await fetchDiplomas()
+  } catch (e) {
+    issueError.value = e.message || 'Не удалось выпустить диплом'
+  } finally {
+    issueLoading.value = false
+  }
+}
 
 function onSearch(q) {
   setSearch(q)
+  fetchDiplomas()
 }
 
 function onStatusFilter() {
-  setStatusFilter(statusFilter.value)
+  const v = statusFilter.value === 'all' ? null : statusFilter.value
+  setStatusFilter(v)
+  fetchDiplomas()
 }
 
 function onSort({ key, dir }) {
   // TODO: сортировка на сервере
 }
 
-function onPage(page) {
-  setPage(page)
-  pagination.value.page = page
+function onPage(p) {
+  setPage(p)
+  fetchDiplomas()
 }
 
 function onRevoke(diploma) {
@@ -362,6 +454,58 @@ async function confirmRevoke() {
 .diplomas__stat-text { display: flex; flex-direction: column; gap: 1px; }
 .diplomas__stat-label { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-black); line-height: 1.3; }
 .diplomas__stat-note { font-size: var(--font-size-xs); color: var(--color-pale-black); }
+
+/* ===========================
+   ISSUE FORM
+   =========================== */
+.diplomas__issue-section {
+  padding: 48px 0;
+  background: #f8fafc;
+  border-top: 1px solid var(--color-gray-blue);
+}
+
+.issue-form {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.issue-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.issue-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-black);
+}
+
+.issue-form__field input {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  padding: 10px 12px;
+  border: 1px solid var(--color-gray-blue);
+  border-radius: var(--radius-base);
+}
+
+.issue-form__err {
+  color: var(--color-red);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.issue-form__ok {
+  color: #166534;
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
 
 /* ===========================
    TABLE SECTION

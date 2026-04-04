@@ -69,13 +69,6 @@ const routes = [
     component: () => import('../views/university/DiplomasListView.vue'),
     meta: { role: 'university' }
   },
-  {
-    path: '/university/settings',
-    name: 'university-settings',
-    component: () => import('../views/university/SettingsView.vue'),
-    meta: { role: 'university' }
-  },
-
   // ЛК Студента
   {
     path: '/student',
@@ -107,12 +100,6 @@ const routes = [
     meta: { role: 'hr' }
   },
   {
-    path: '/hr/bulk',
-    name: 'hr-bulk',
-    component: () => import('../views/hr/BulkVerifyView.vue'),
-    meta: { role: 'hr' }
-  },
-  {
     path: '/hr/reports',
     name: 'hr-reports',
     component: () => import('../views/hr/ReportsView.vue'),
@@ -135,7 +122,16 @@ const router = createRouter({
 // Глобальный guard для проверки роли
 router.beforeEach((to, from, next) => {
   // Публичные маршруты — всегда доступны
-  const publicRoutes = ['login', 'register', 'verify', 'verify-share', 'api-docs', 'not-found']
+  const publicRoutes = [
+    'login',
+    'register',
+    'verify',
+    'verify-share',
+    'api-docs',
+    'not-found',
+    'privacy',
+    'terms',
+  ]
   if (publicRoutes.includes(to.name)) {
     return next()
   }

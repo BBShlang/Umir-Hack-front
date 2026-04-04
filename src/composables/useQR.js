@@ -1,31 +1,30 @@
 /**
- * useQR — управление share-токенами, генерация QR-ссылок
- * Реальный API бэкенда ДиплоРеестр
+ * useQR — генерация QR-кодов для дипломов через реальный API
+ * POST /api/qr/certificates/{certificateId}
  */
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { api } from '../api/api.js'
 import { useAuth } from './useAuth.js'
 
-const shareTokens = ref([])
 const loading = ref(false)
 const error = ref(null)
+const lastQrResult = ref(null)
 
 export function useQR() {
   const { accessToken } = useAuth()
 
   /**
-   * Создать share-токен для диплома
-   * @param {number} diplomaId
-   * @param {number} ttlDays — срок жизни в днях (1-30, по умолч. 7)
-   * @returns {Promise<{token, url, expiresAt}>}
+   * Сгенерировать QR-код для диплома
+   * @param {string} certificateId — UUID диплома
+   * @returns {Promise<{qrId, certificateId, token, qrContent, expiresAt}>}
    */
-  async function createShareToken(diplomaId, ttlDays = 7) {
+  async function generateCertificateQr(certificateId) {
     loading.value = true
     error.value = null
+    lastQrResult.value = null
     try {
-      const res = await api.createShareToken({ diplomaId, ttlDays }, accessToken.value)
-      // Обновляем список
-      await fetchTokens()
+      const res = await api.generateCertificateQr(certificateId, accessToken.value)
+      lastQrResult.value = res
       return res
     } catch (err) {
       error.value = err.message
@@ -36,43 +35,18 @@ export function useQR() {
   }
 
   /**
-   * Получить список активныхых токенов пользователя
-   */
-  async function fetchTokens() {
-    loading.value = true
-    error.value = null
-    try {
-      const res = await api.getShareTokens(accessToken.value)
-      shareTokens.value = res || []
-      return shareTokens.value
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  /**
-   * Отозвать share-токен
+   * Построить полную URL для публичной верификации
+   * @param {string} certificateId
    * @param {string} token
+   * @returns {string}
    */
-  async function revokeToken(token) {
-    loading.value = true
-    error.value = null
-    try {
-      await api.deleteShareToken(token, accessToken.value)
-      await fetchTokens()
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
+  function buildVerifyUrl(certificateId, token) {
+    const base = window.location.origin
+    return `${base}/verify?certificateId=${encodeURIComponent(certificateId)}&token=${encodeURIComponent(token)}`
   }
 
   /**
-   * Получить оставшееся время для токена
+   * Получить оставшееся время для QR-токена
    * @param {string} expiresAt — ISO дата
    * @returns {string}
    */
@@ -83,36 +57,26 @@ export function useQR() {
 
     const days = Math.floor(left / (1000 * 60 * 60 * 24))
     const hours = Math.floor((left % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((left % (1000 * 60 * 60)) / (1000 * 60))
 
     if (days > 0) return `${days} дн. ${hours} ч.`
-    return `${hours} ч.`
-  }
-
-  /**
-   * Построить полную URL для share-токена
-   * @param {string} token
-   * @returns {string}
-   */
-  function buildShareUrl(token) {
-    const base = window.location.origin
-    return `${base}/verify/share/${token}`
+    if (hours > 0) return `${hours} ч. ${minutes} мин.`
+    return `${minutes} мин.`
   }
 
   function reset() {
-    shareTokens.value = []
+    lastQrResult.value = null
     loading.value = false
     error.value = null
   }
 
   return {
-    shareTokens,
     loading,
     error,
-    createShareToken,
-    fetchTokens,
-    revokeToken,
+    lastQrResult,
+    generateCertificateQr,
+    buildVerifyUrl,
     getTimeLeft,
-    buildShareUrl,
     reset,
   }
 }

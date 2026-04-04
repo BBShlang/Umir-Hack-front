@@ -142,8 +142,16 @@
                       </div>
                       
                       <span :class="['status-pill', d.status]">
-                        <span class="status-dot" /> 
-                        {{ d.status === 'active' ? 'Действителен' : 'Аннулирован' }}
+                        <span class="status-dot" />
+                        {{
+                          d.status === 'active'
+                            ? 'Действителен'
+                            : d.status === 'revoked'
+                              ? 'Аннулирован'
+                              : d.status === 'expired'
+                                ? 'Истёк'
+                                : 'Статус уточняется'
+                        }}
                       </span>
                     </div>
 
@@ -354,19 +362,59 @@ import {
 import { useRouter } from 'vue-router'
 import AppFooter from '../../components/common/AppFooter.vue'
 import VerificationTracker from '../../components/student/VerificationTracker.vue'
+import { loadAllCertificates } from '../../utils/certificatesStore.js'
+import { useAuth } from '../../composables/useAuth.js'
+import { api } from '../../api/api.js'
 
 const router = useRouter()
+const { user, accessToken, logout } = useAuth()
 
-// База данных дипломов
-const DIPLOMAS_DB = [
-  { id: '1', studentId: 'STU-001', fullName: 'Иванов Иван Иванович', degree: 'Бакалавр', number: 'DIP-2023-001', university: 'МГТУ им. Баумана', specialty: 'Информатика и ВТ', year: '2023', status: 'active', verifiedCount: 12, lastVerified: '2 часа назад' },
-  { id: '2', studentId: 'STU-001', fullName: 'Иванов Иван Иванович', degree: 'Магистр', number: 'DIP-2024-789', university: 'Финансовый университет', specialty: 'Экономика', year: '2024', status: 'active', verifiedCount: 3, lastVerified: 'вчера' },
-  { id: '3', studentId: 'STU-001', fullName: 'Иванов Иван Иванович', degree: 'Бакалавр', number: 'DIP-2021-555', university: 'МГУ им. Ломоносова', specialty: 'Физика', year: '2021', status: 'revoked', verifiedCount: 0, lastVerified: '-' }
-]
+/** Нормализация статуса бэкенда (ACTIVE) → бейдж (active) */
+function normalizeDiplomaStatus(s) {
+  const u = String(s || '').toLowerCase()
+  if (u === 'active' || u === 'активен') return 'active'
+  if (u === 'revoked' || u === 'отозван') return 'revoked'
+  if (u === 'expired' || u === 'истёк') return 'expired'
+  if (u === 'pending') return 'pending'
+  return 'pending'
+}
 
-const user = {
-  id: 'STU-001',
-  name: 'Иванов Иван Иванович'
+/** Локальный кэш после выпуска в этом браузере */
+function mapCertToCard(c) {
+  return {
+    id: c.id,
+    studentId: c.studentId,
+    fullName: c.studentName,
+    degree: 'Бакалавр',
+    number: c.serialNumber,
+    serialNumber: c.serialNumber,
+    university: c.universityCode || 'Учебное заведение',
+    specialty: c.specialty,
+    year: String(c.graduationYear || ''),
+    status: normalizeDiplomaStatus(c.status),
+    verifiedCount: 0,
+    lastVerified: '—',
+  }
+}
+
+/** Ответ GET /api/certificates/my (StudentCertificateItemResponse) */
+function mapApiItemToCard(item) {
+  return {
+    id: item.certificateId,
+    studentId: user.value?.studentId,
+    fullName: item.diplomaNumber || 'Диплом',
+    degree: 'Диплом',
+    number: item.diplomaNumber,
+    serialNumber: item.diplomaNumber,
+    university: item.universityName || '—',
+    specialty: item.specialty || '—',
+    year: String(item.graduationYear ?? ''),
+    status: normalizeDiplomaStatus(item.status),
+    verifiedCount: 0,
+    lastVerified: '—',
+    issuedAt: item.issuedAt,
+    expiresAt: item.expiresAt,
+  }
 }
 
 // Реактивные состояния
@@ -394,16 +442,32 @@ const fileInputRef = ref(null)
 let loadingTimer = null
 let countdownInterval = null
 
-const activeCount = computed(() => diplomas.value.filter(d => d.status === 'active').length)
+const activeCount = computed(() =>
+  diplomas.value.filter((d) => String(d.status || '').toLowerCase() === 'active').length
+)
 const downloadsCount = computed(() => diplomas.value.length * 3)
 
-// Загрузка дипломов при монтировании
+// Сначала API студента (Swagger: GET /api/certificates/my), при ошибке — локальный кэш
 onMounted(() => {
-  loadingTimer = setTimeout(() => {
-    diplomas.value = DIPLOMAS_DB.filter(d => d.studentId === user.id)
+  loadingTimer = setTimeout(async () => {
+    try {
+      const list = await api.getMyCertificates(accessToken.value)
+      if (Array.isArray(list)) {
+        diplomas.value = list.map(mapApiItemToCard)
+        skeletonLoading.value = false
+        loading.value = false
+        return
+      }
+    } catch {
+      /* fallback ниже */
+    }
+    const sid = user.value?.studentId
+    const all = loadAllCertificates()
+    const mine = sid ? all.filter((x) => x.studentId === sid) : []
+    diplomas.value = mine.map(mapCertToCard)
     skeletonLoading.value = false
     loading.value = false
-  }, 600)
+  }, 100)
 })
 
 // Таймер обратного отсчёта для QR-кода
@@ -473,17 +537,26 @@ const handleShare = (id) => {
   }
 }
 
-// Генерация QR-кода
-const generateQR = () => {
+// Генерация QR-кода (POST /api/qr/certificates/{id})
+const generateQR = async () => {
   if (!expandedId.value || !qrActive.value) return
-  
-  const expiry = new Date(Date.now() + 24 * 3600000)
-  qrExpiry.value = expiry
-  qrUrl.value = `https://verify.diasoft.ru/check/${expandedId.value}?ttl=${FIXED_TTL}&exp=${expiry.getTime()}`
-  qrActive.value = true
-  
-  startCountdown()
-  showNotification('QR-код успешно сгенерирован')
+
+  try {
+    const res = await api.generateCertificateQr(expandedId.value, accessToken.value)
+    const link =
+      res.qrContent ||
+      `${window.location.origin}/verify?certificateId=${encodeURIComponent(res.certificateId || expandedId.value)}&token=${encodeURIComponent(res.token || '')}`
+    qrUrl.value = link
+    qrExpiry.value = res.expiresAt ? new Date(res.expiresAt) : new Date(Date.now() + 24 * 3600000)
+    qrActive.value = true
+    startCountdown()
+    showNotification('QR-код успешно сгенерирован')
+  } catch (e) {
+    qrUrl.value = ''
+    qrExpiry.value = null
+    stopCountdown()
+    showNotification(e.message || 'Не удалось создать QR (проверьте роль STUDENT и права API)')
+  }
 }
 
 // Копирование ссылки в буфер обмена
@@ -574,9 +647,9 @@ const shareToMessenger = (platform) => {
   showShareMenu.value = false
 }
 
-// Выход из аккаунта
-const handleLogout = () => {
-  emit('logout')
+async function handleLogout() {
+  await logout()
+  router.push({ name: 'login' })
 }
 
 // Очистка при размонтировании

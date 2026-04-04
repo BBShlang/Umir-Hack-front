@@ -1,26 +1,66 @@
 <template>
   <form @submit.prevent="onSubmit" class="vf">
-    <div class="vf-row">
-      <div class="vf-field">
-        <label class="vf-label">Серийный номер диплома</label>
-        <input
-          v-model="serialNumber"
-          type="text"
-          class="vf-input"
-          placeholder="Например: 12345678901234"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </div>
-      <button type="submit" class="vf-btn" :disabled="loading || !serialNumber.trim()">
-        <svg v-if="loading" class="vf-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round">
-            <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/>
-          </circle>
-        </svg>
-        <span>{{ loading ? 'Проверка…' : 'Проверить' }}</span>
-      </button>
+    <div class="vf-mode">
+      <label class="vf-mode__item">
+        <input v-model="mode" type="radio" value="serial" />
+        <span>По номеру диплома</span>
+      </label>
+      <label class="vf-mode__item">
+        <input v-model="mode" type="radio" value="crypto" />
+        <span>Криптопроверка (API)</span>
+      </label>
     </div>
+
+    <template v-if="mode === 'serial'">
+      <div class="vf-row">
+        <div class="vf-field">
+          <label class="vf-label">Номер диплома</label>
+          <input
+            v-model="serialNumber"
+            type="text"
+            class="vf-input"
+            placeholder="Например: DIP-2026-001"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <button type="submit" class="vf-btn" :disabled="loading || !serialNumber.trim()">
+          <svg v-if="loading" class="vf-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="31.4 31.4" stroke-linecap="round">
+              <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <span>{{ loading ? 'Проверка…' : 'Проверить' }}</span>
+        </button>
+      </div>
+      <p class="vf-hint">
+        Ищем среди дипломов, выпущенных в этом браузере (локальный кэш). Для произвольных данных используйте криптопроверку.
+      </p>
+    </template>
+
+    <template v-else>
+      <div class="vf-crypto">
+        <div class="vf-field">
+          <label class="vf-label">Код университета</label>
+          <input v-model="universityCode" type="text" class="vf-input" placeholder="AITU-01" />
+        </div>
+        <div class="vf-field">
+          <label class="vf-label">Payload</label>
+          <input v-model="payload" type="text" class="vf-input" placeholder="Исходная строка payload" />
+        </div>
+        <div class="vf-field">
+          <label class="vf-label">Подпись (base64)</label>
+          <textarea v-model="signature" class="vf-input vf-input--area" rows="3" placeholder="Base64 подписи" />
+        </div>
+        <button
+          type="submit"
+          class="vf-btn vf-btn--block"
+          :disabled="loading || !universityCode.trim() || !payload.trim() || !signature.trim()"
+        >
+          {{ loading ? 'Проверка…' : 'Проверить подпись' }}
+        </button>
+      </div>
+    </template>
 
     <Transition name="vf-fade">
       <div v-if="result" class="vf-res" :class="result.statusClass">
@@ -38,14 +78,16 @@
           <h4 class="vf-res-title">{{ result.title }}</h4>
         </div>
         <dl class="vf-res-grid">
-          <span class="vf-res-k">ВУЗ</span>
-          <span class="vf-res-v">{{ result.university || '—' }}</span>
-          <span class="vf-res-k">Специальность</span>
-          <span class="vf-res-v">{{ result.specialty || '—' }}</span>
-          <span class="vf-res-k">Дата выдачи</span>
-          <span class="vf-res-v">{{ result.issueDate || '—' }}</span>
-          <span class="vf-res-k">Статус</span>
-          <span class="vf-res-v"><StatusBadge :status="result.status" /></span>
+          <template v-if="result.rows?.length">
+            <template v-for="(row, i) in result.rows" :key="i">
+              <span class="vf-res-k">{{ row.k }}</span>
+              <span class="vf-res-v">{{ row.v }}</span>
+            </template>
+          </template>
+          <template v-else>
+            <span class="vf-res-k">Ответ</span>
+            <span class="vf-res-v"><pre class="vf-pre">{{ result.rawJson }}</pre></span>
+          </template>
         </dl>
       </div>
     </Transition>
@@ -64,38 +106,79 @@
 
 <script setup>
 import { ref } from 'vue'
-import StatusBadge from '../common/StatusBadge.vue'
+import { api } from '../../api/api.js'
+import { findCertificateByNumber } from '../../utils/certificatesStore.js'
+import { useAuth } from '../../composables/useAuth.js'
 
 const emit = defineEmits(['verify', 'error'])
 
+const { accessToken } = useAuth()
+
+const mode = ref('serial')
 const serialNumber = ref('')
+const universityCode = ref('')
+const payload = ref('')
+const signature = ref('')
 const loading = ref(false)
 const result = ref(null)
 const error = ref('')
 
-async function onSubmit() {
-  if (!serialNumber.value.trim()) return
+function formatDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toLocaleDateString('ru-RU')
+}
 
+async function onSubmit() {
   loading.value = true
   error.value = ''
   result.value = null
 
   try {
-    await new Promise(r => setTimeout(r, 800))
-
-    result.value = {
-      isValid: true,
-      status: 'active',
-      statusClass: 'vf-res--ok',
-      title: 'Диплом действителен',
-      university: 'МГТУ им. Баумана',
-      specialty: 'Информатика и вычислительная техника',
-      issueDate: '15.06.2025'
+    if (mode.value === 'serial') {
+      const cert = findCertificateByNumber(serialNumber.value)
+      if (!cert) {
+        throw new Error(
+          'Диплом не найден в локальном кэше. Выпустите его в ЛК ВУЗа на этом устройстве или используйте криптопроверку.'
+        )
+      }
+      const ok = cert.status === 'active'
+      result.value = {
+        isValid: ok,
+        status: cert.status,
+        statusClass: ok ? 'vf-res--ok' : 'vf-res--fail',
+        title: ok ? 'Диплом найден (локальный кэш)' : 'Диплом отозван в кэше',
+        rows: [
+          { k: 'ФИО', v: cert.studentName || '—' },
+          { k: 'Специальность', v: cert.specialty || '—' },
+          { k: 'Номер', v: cert.serialNumber || '—' },
+          { k: 'Дата выпуска', v: formatDate(cert.issueDate) },
+          { k: 'Хеш payload', v: cert.hash ? `${cert.hash.slice(0, 16)}…` : '—' },
+        ],
+      }
+      emit('verify', { serial: serialNumber.value, certificate: cert })
+    } else {
+      const res = await api.cryptoVerify(
+        {
+          universityCode: universityCode.value.trim(),
+          payload: payload.value.trim(),
+          signature: signature.value.trim(),
+        },
+        accessToken.value
+      )
+      const rawJson = JSON.stringify(res, null, 2)
+      result.value = {
+        isValid: true,
+        statusClass: 'vf-res--ok',
+        title: 'Ответ API проверки подписи',
+        rows: [],
+        rawJson,
+      }
+      emit('verify', { crypto: true, response: res })
     }
-
-    emit('verify', { serial: serialNumber.value, ...result.value })
   } catch (err) {
-    error.value = 'Ошибка при проверке. Попробуйте позже.'
+    error.value = err.message || 'Ошибка при проверке'
     emit('error', err)
   } finally {
     loading.value = false
@@ -110,7 +193,55 @@ async function onSubmit() {
   gap: var(--space-5);
 }
 
-/* ---- Row ---- */
+.vf-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 13px;
+}
+
+.vf-mode__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--color-black);
+}
+
+.vf-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-pale-black);
+  line-height: 1.45;
+}
+
+.vf-crypto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.vf-input--area {
+  resize: vertical;
+  min-height: 72px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.vf-btn--block {
+  width: 100%;
+  justify-content: center;
+}
+
+.vf-pre {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+}
+
 .vf-row {
   display: flex;
   gap: var(--space-3);
@@ -155,7 +286,6 @@ async function onSubmit() {
   box-shadow: 0 0 0 3px rgba(38, 75, 130, 0.1);
 }
 
-/* ---- Button ---- */
 .vf-btn {
   display: inline-flex;
   align-items: center;
@@ -188,7 +318,6 @@ async function onSubmit() {
   flex-shrink: 0;
 }
 
-/* ---- Result ---- */
 .vf-res {
   border: 1px solid;
   border-radius: var(--radius-lg);
@@ -251,7 +380,6 @@ async function onSubmit() {
   color: var(--color-black);
 }
 
-/* ---- Error ---- */
 .vf-err {
   display: flex;
   align-items: center;
@@ -269,7 +397,6 @@ async function onSubmit() {
   color: #dc2626;
 }
 
-/* ---- Transition ---- */
 .vf-fade-enter-active,
 .vf-fade-leave-active {
   transition: opacity 0.25s ease;
@@ -280,7 +407,6 @@ async function onSubmit() {
   opacity: 0;
 }
 
-/* ---- Mobile ---- */
 @media (max-width: 768px) {
   .vf-row {
     flex-direction: column;
