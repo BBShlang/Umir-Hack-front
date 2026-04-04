@@ -93,13 +93,7 @@ const routes = [
     component: () => import('../views/student/MyDiplomasView.vue'),
     meta: { role: 'student' }
   },
-  {
-    path: '/student/share/:id?',
-    name: 'student-share',
-    component: () => import('../views/student/ShareView.vue'),
-    meta: { role: 'student' },
-    props: true
-  },
+
 
   // HR-портал
   {
@@ -141,12 +135,12 @@ const router = createRouter({
 // Глобальный guard для проверки роли
 router.beforeEach((to, from, next) => {
   // Публичные маршруты — всегда доступны
-  const publicRoutes = ['home', 'login', 'register', 'verify', 'verify-share', 'api-docs', 'not-found']
+  const publicRoutes = ['login', 'register', 'verify', 'verify-share', 'api-docs', 'not-found']
   if (publicRoutes.includes(to.name)) {
     return next()
   }
 
-  const token = localStorage.getItem('auth_token')
+  const token = localStorage.getItem('access_token')
 
   // Если нет токена — на логин
   if (!token) {
@@ -155,8 +149,6 @@ router.beforeEach((to, from, next) => {
 
   // Если маршрут требует роль — проверяем
   if (to.meta.role) {
-    // Пока нет реального API — пропускаем если есть токен
-    // TODO: добавить проверку роли через API-ответ при инициализации
     const savedRole = localStorage.getItem('user_role')
     if (savedRole && savedRole !== to.meta.role) {
       // Роль не совпадает — редирект на свой дашборд

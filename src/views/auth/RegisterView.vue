@@ -18,8 +18,19 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await register({ name: nameVal.value, email: emailVal.value, role: roleVal.value })
-    router.push('/university/dashboard')
+    await register({
+      name: nameVal.value,
+      email: emailVal.value,
+      password: pwdVal.value,
+      role: roleVal.value,
+    })
+    // Редирект зависит от роли
+    const roleDashboards = {
+      university: '/university/dashboard',
+      student: '/student/dashboard',
+      hr: '/hr/verify',
+    }
+    router.push(roleDashboards[roleVal.value] || '/login')
   } catch (err) {
     error.value = err.message || 'Ошибка регистрации'
   } finally {

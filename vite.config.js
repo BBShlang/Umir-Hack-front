@@ -10,10 +10,17 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       allowedHosts: ['buoyantly-positive-prawn.cloudpub.ru'],
-      // Проксируем /api и /auth на бэкенд, чтобы обойти CORS в dev-режиме
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL,
+          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/v3': {
+          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/actuator': {
+          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
           changeOrigin: true,
         },
       },
