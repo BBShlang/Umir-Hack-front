@@ -21,14 +21,6 @@
             <p class="verify__hero-subtitle">
               Введите номер диплома или отсканируйте QR-код для мгновенной проверки подлинности документа в государственном реестре.
             </p>
-
-            <div class="verify__examples">
-              <span class="verify__examples-label">Формат номера:</span>
-              <div class="verify__examples-list">
-                <span class="verify__example-btn">12345678901234</span>
-                <span class="verify__example-btn">АБ-2024-001234</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -62,10 +54,7 @@
                     <Camera size="20" />
                     <span>Камера</span>
                   </button>
-                  <button class="verify__qr-mode-btn" @click="fileInputRef?.click()">
-                    <Upload size="20" />
-                    <span>Загрузить</span>
-                  </button>
+
                   <input
                     ref="fileInputRef"
                     type="file"
@@ -220,16 +209,16 @@ const initializeCamera = async () => {
       throw new Error('Камеры не найдены на устройстве')
     }
 
-    await html5QrCodeRef.value.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-      },
-      onScanSuccess,
-      onScanFailure
-    )
+await html5QrCodeRef.value.start(
+  { facingMode: "environment" },
+  {
+    fps: 12,
+    qrbox: { width: 480, height: 480 },
+    aspectRatio: 1.0
+  },
+  onScanSuccess,
+  onScanFailure
+)
     
     isCameraReady.value = true
   } catch (err) {
@@ -559,7 +548,7 @@ onUnmounted(() => {
    =========================== */
 .dashboard-layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 440px;
   gap: var(--space-6);
   align-items: start;
 }
@@ -999,17 +988,19 @@ onUnmounted(() => {
 
 .verify__qr-mode-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  width: 160px;
+  height: 160px;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   font-family: var(--font-family);
   color: var(--color-pale-black);
   background: var(--color-pale-blue);
-  border: 1px solid var(--color-gray-blue);
-  border-radius: var(--radius-base);
+  border: 2px solid var(--color-gray-blue);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -1032,17 +1023,21 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
 }
 
 .verify__qr-reader {
   width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: #000;
 }
 
 .verify__qr-reader video {
-  width: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
   border-radius: var(--radius-md);
 }
 

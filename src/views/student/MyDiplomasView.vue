@@ -21,7 +21,7 @@
             </p>
             <div class="diplomas__hero-actions">
               <router-link to="/student/dashboard" class="diplomas__btn diplomas__btn--outline">На дашборд</router-link>
-
+              <router-link to="/student/search" class="diplomas__btn diplomas__btn--primary">Подать заявку</router-link>
             </div>
           </div>
         </div>
@@ -265,7 +265,7 @@
                   <Mail :size="24" />
                 </div>
                 <h4>Поддержка</h4>
-                <a href="mailto:support@diasoft.ru" class="sidebar-link">support@diasoft.ru</a>
+                <a >support@diasoft.ru</a>
               </div>
               
               <div class="info-card sidebar-card-help">

@@ -100,7 +100,7 @@
                     <div class="stats-row"></div>
                   </div>
                   <div class="card-v-footer">
-                    <button class="btn-share-v btn-share-v--purple">
+                    <button class="btn-share-v ">
                       <span>Открыть заявки</span>
                       <span class="arrow">→</span>
                     </button>

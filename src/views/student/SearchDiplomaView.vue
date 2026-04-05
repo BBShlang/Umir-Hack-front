@@ -20,6 +20,11 @@
             <p class="search-diploma__subtitle">
               Найдите свой диплом по номеру и коду университета, отправьте заявку на привязку.
             </p>
+
+            <div class="search-diploma__hero-actions">
+              <router-link to="/student/dashboard" class="search-diploma__btn search-diploma__btn--outline">На дашборд</router-link>
+              <router-link to="/student/diplomas" class="search-diploma__btn search-diploma__btn--primary">Мои дипломы</router-link>
+            </div>
           </div>
         </div>
       </section>
@@ -30,7 +35,7 @@
           <div class="search-card">
             <h2 class="search-card__title">Найти диплом</h2>
             <p class="search-card__desc">
-              Поиск в реестре: GET /api/public/certificates/search — только номер диплома. Код университета сверяется с ответом (не передаётся в query).
+              Поиск в реестре — только номер диплома.
             </p>
 
             <form class="search-form" @submit.prevent="onSearch">
@@ -374,6 +379,50 @@ async function onClaim() {
   color: rgba(255, 255, 255, 0.65);
   line-height: 1.7;
   margin: 0;
+}
+
+.search-diploma__hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.search-diploma__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family);
+  border-radius: var(--radius-base);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: 2px solid transparent;
+}
+
+.search-diploma__btn--primary {
+  background: var(--color-main-blue);
+  color: #fff;
+  border-color: var(--color-main-blue);
+}
+
+.search-diploma__btn--primary:hover {
+  background: #1a5bbd;
+  border-color: #1a5bbd;
+}
+
+.search-diploma__btn--outline {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.search-diploma__btn--outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* ===========================

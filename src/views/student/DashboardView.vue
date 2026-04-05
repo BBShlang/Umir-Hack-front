@@ -18,28 +18,16 @@
             </h1>
 
             <p class="dashboard__subtitle">
-              Публичный поиск по номеру диплома (GET /api/public/certificates/search). Полный список ваших дипломов — в разделе «Мои дипломы» (GET /api/certificates/my).
+              Публичный поиск по номеру диплома 
             </p>
             <div class="dashboard__hero-actions">
-              <router-link to="/student/search" class="dashboard__btn dashboard__btn--primary">Найти диплом</router-link>
+              <router-link to="/student/search" class="dashboard__btn dashboard__btn--primary">Подать заявку</router-link>
               <router-link to="/student/diplomas" class="dashboard__btn dashboard__btn--outline">Мои дипломы</router-link>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ===== Info Banner ===== -->
-      <div class="container">
-        <div class="info-banner">
-          <div class="banner-icon-bg">
-            <Search :size="24" class="banner-icon" />
-          </div>
-          <div class="banner-text">
-            <h4>Поиск в публичном реестре</h4>
-            <p>Укажите номер диплома — запрос без авторизации, как в OpenAPI бэкенда.</p>
-          </div>
-        </div>
-      </div>
 
       <!-- ===== Основная рабочая зона ===== -->
       <section class="dashboard__workspace">
@@ -55,7 +43,7 @@
               <div class="dashboard__search-card">
                 <form @submit.prevent="onSearch" class="sf">
                   <div class="sf-field">
-                    <label class="sf-label">Номер диплома (diplomaNumber)</label>
+                    <label class="sf-label">Номер диплома</label>
                     <div class="sf-input-wrapper">
                       <Search :size="18" class="sf-input-icon" />
                       <input
@@ -68,7 +56,7 @@
                       />
                     </div>
                     <p class="sf-hint">
-                      Только номер диплома (как в Swagger: query <code class="sf-hint-code">diplomaNumber</code>). ФИО сюда не передаётся.
+                     ФИО сюда не передаётся.
                     </p>
                   </div>
 

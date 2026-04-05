@@ -47,7 +47,7 @@
             <p class="diplomas__how-eyebrow">Выпуск</p>
             <h2 class="diplomas__how-title">Новый диплом</h2>
             <p class="diplomas__how-desc">
-              Тело POST /api/certificates: universityCode,, diplomaNumber, fullName, specialty, graduationYear.
+
             </p>
           </div>
           <form class="issue-form" @submit.prevent="onIssueSubmit">

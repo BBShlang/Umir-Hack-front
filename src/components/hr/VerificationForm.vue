@@ -16,11 +16,7 @@
         <span>{{ loading ? 'Проверка…' : 'Проверить' }}</span>
       </button>
     </div>
-    <p class="vf-hint">
-      {{ isEmployer
-        ? 'Авторизованный работодатель использует GET /api/employer/certificates/search.'
-        : 'Гость использует GET /api/public/certificates/search.' }}
-    </p>
+
 
     <div v-if="result" class="vf-res" :class="result.statusClass">
       <div class="vf-res-head">

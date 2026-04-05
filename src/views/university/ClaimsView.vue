@@ -20,9 +20,9 @@
               Студенты отправляют заявки на привязку дипломов. Подтвердите или отклоните каждую заявку.
             </p>
             <div class="claims__hero-actions">
-              <button class="claims__btn claims__btn--outline" @click="fetchClaims">
-                <RefreshCw :size="16" :class="{ spin: loading }" />
-                <span>Обновить</span>
+              <button class="claims__btn claims__btn--outline" @click="router.push({ name: 'university-dashboard' })">
+                <LayoutDashboard :size="16" />
+                <span>Дашборд</span>
               </button>
             </div>
           </div>
@@ -184,11 +184,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { RefreshCw, FileSearch, Loader2, Check, X } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { LayoutDashboard, FileSearch, Loader2, Check, X } from 'lucide-vue-next'
 import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
 import { useClaims } from '../../composables/useClaims.js'
+
+const router = useRouter()
 
 const {
   loading,
@@ -242,10 +245,6 @@ function formatDate(dateStr) {
   }
 }
 
-async function fetchClaims() {
-  await fetchUniversityClaims()
-}
-
 async function onApprove(claim) {
   actionLoading.value = claim.requestId
   try {
@@ -286,7 +285,7 @@ async function onReject() {
 }
 
 onMounted(() => {
-  fetchClaims()
+  fetchUniversityClaims()
 })
 </script>
 
