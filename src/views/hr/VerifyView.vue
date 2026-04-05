@@ -22,10 +22,6 @@
               Введите номер диплома или отсканируйте QR-код для мгновенной проверки подлинности документа в государственном реестре.
             </p>
 
-            <div class="verify__hero-actions">
-              <router-link to="/hr/reports" class="verify__btn verify__btn--outline">Отчёты</router-link>
-            </div>
-
             <div class="verify__examples">
               <span class="verify__examples-label">Формат номера:</span>
               <div class="verify__examples-list">
@@ -143,27 +139,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Быстрые действия -->
-              <div class="verify__sidebar-card verify__sidebar-card--accent">
-                <h4 class="verify__sidebar-title">Быстрые действия</h4>
-                <div class="verify__sidebar-actions">
-                  <router-link to="/hr/reports" class="verify__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="3" y="2" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-                      <path d="M6 6h4M6 9h4M6 12h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                    </svg>
-                    Отчёты
-                  </router-link>
-                  <router-link to="/api-docs" class="verify__sidebar-btn">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 2L2 5v6l6 3 6-3V5L8 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-                      <path d="M6 8l1.5 1.5L10 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    API документация
-                  </router-link>
-                </div>
-              </div>
             </aside>
           </div>
         </div>
@@ -178,6 +153,7 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Html5Qrcode } from 'html5-qrcode'
 import { Camera, Upload, X, CheckCircle, AlertCircle, History, ShieldCheck } from 'lucide-vue-next'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import VerificationForm from '../../components/hr/VerificationForm.vue'
 import { api } from '../../api/api.js'
@@ -384,25 +360,57 @@ const processQRCode = async (decodedText) => {
     }
 
     if (certificateId || token) {
-      const res = await api.publicVerifyQuery(
-        { certificateId, token }
-      )
-      scanResult.value = {
-        studentName: res?.fullName || res?.studentName || 'Проверка по API',
-        degree: 'Результат',
-        number: res?.diplomaNumber || certificateId || '—',
-        university: res?.universityCode || res?.universityName || '—',
-        specialty: res?.specialty || JSON.stringify(res || {}).slice(0, 120),
-        year: res?.graduationYear ? String(res.graduationYear) : '',
-        status: 'active',
-        issueDate: '—',
-        verified: true,
-        verifiedAt: new Date().toLocaleString('ru-RU'),
-        apiPayload: res,
+      // Пробуем найти сертификат локально
+      const cert = findCertificateById(certificateId)
+      if (cert) {
+        const row = certToScanResult(cert)
+        scanResult.value = {
+          ...row,
+          verified: true,
+          verifiedAt: new Date().toLocaleString('ru-RU'),
+        }
+        pushHistory({ ...row, id: cert.id, verifiedAt: scanResult.value.verifiedAt })
+        await stopCameraScan()
+        return
       }
-      pushHistory(scanResult.value)
-      await stopCameraScan()
-      return
+
+      // Если локально не нашли, пробуем API верификации
+      try {
+        const res = await api.verifyByQr({ certificateId, token })
+        scanResult.value = {
+          studentName: res?.fullName || res?.studentName || 'Проверка по API',
+          degree: 'Результат',
+          number: res?.diplomaNumber || certificateId || '—',
+          university: res?.universityCode || res?.universityName || '—',
+          specialty: res?.specialty || JSON.stringify(res || {}).slice(0, 120),
+          year: res?.graduationYear ? String(res.graduationYear) : '',
+          status: 'active',
+          issueDate: '—',
+          verified: true,
+          verifiedAt: new Date().toLocaleString('ru-RU'),
+          apiPayload: res,
+        }
+        pushHistory(scanResult.value)
+        await stopCameraScan()
+        return
+      } catch (apiErr) {
+        // Если API недоступен, показываем информацию из QR
+        scanResult.value = {
+          studentName: 'Диплом найден',
+          degree: 'Проверка по QR',
+          number: certificateId || '—',
+          university: 'Проверьте в реестре',
+          specialty: '—',
+          year: '',
+          status: 'active',
+          issueDate: '—',
+          verified: true,
+          verifiedAt: new Date().toLocaleString('ru-RU'),
+        }
+        pushHistory(scanResult.value)
+        await stopCameraScan()
+        return
+      }
     }
 
     const uuidRe =

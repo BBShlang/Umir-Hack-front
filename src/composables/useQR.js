@@ -6,12 +6,12 @@ import { ref } from 'vue'
 import { api } from '../api/api.js'
 import { useAuth } from './useAuth.js'
 
-const loading = ref(false)
-const error = ref(null)
-const lastQrResult = ref(null)
-
 export function useQR() {
   const { accessToken } = useAuth()
+
+  const loading = ref(false)
+  const error = ref(null)
+  const lastQrResult = ref(null)
 
   /**
    * Сгенерировать QR-код для диплома

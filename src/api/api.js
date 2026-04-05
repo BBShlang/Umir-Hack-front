@@ -53,7 +53,7 @@ function pickErrorMessage(payload, status) {
     const msg = parts.join('. ').trim()
     return (
       msg ||
-      `Ошибка сервера (${status}). Частые причины: неверный код ВУЗа относительно JWT, студент не из вашей БД, сбой подписи на бэкенде. Смотрите логи Spring и тело ответа в Network.`
+      `Ошибка сервера (${status}). Для публичного поиска диплома это обычно баг на бэкенде (не пойманное исключение) — смотрите логи Spring; при отсутствии диплома ожидается 404, а не 500.`
     )
   }
   if (!payload || typeof payload !== 'object') return `HTTP ${status}`
@@ -66,18 +66,65 @@ function pickErrorMessage(payload, status) {
     `HTTP ${status}`
   return val ? `${base} (${val})` : base
 }
+function splitDiplomaNumber(diplomaNumber) {
+  if (!diplomaNumber || typeof diplomaNumber !== 'string') {
+    return { series: null, number: null }
+  }
+
+  const parts = diplomaNumber.split('-')
+  if (parts.length >= 2) {
+    return {
+      series: parts.slice(0, -1).join('-') || null,
+      number: parts[parts.length - 1] || diplomaNumber,
+    }
+  }
+
+  return { series: null, number: diplomaNumber }
+}
+
+function normalizeCertificate(item) {
+  if (!item || typeof item !== 'object') return item
+
+  const { series, number } = splitDiplomaNumber(item.diplomaNumber)
+
+  return {
+    // Оригинальные поля бэкенда сохраняем
+    ...item,
+
+    // Поля, которые уже ждёт фронт
+    id: item.certificateId ?? null,
+    certificateId: item.certificateId ?? null,
+
+    number: item.number ?? number ?? item.diplomaNumber ?? null,
+    series: item.series ?? series ?? null,
+
+    issueDate: item.issueDate ?? item.issuedAt ?? null,
+    hash: item.hash ?? item.payloadHash ?? item.certificateId ?? null,
+
+    isVerified:
+      typeof item.isVerified === 'boolean'
+        ? item.isVerified
+        : item.status === 'ACTIVE',
+  }
+}
+
+function normalizeCertificates(items) {
+  return Array.isArray(items) ? items.map(normalizeCertificate) : []
+}
 
 /**
  * Универсальный запрос JSON
  * — Content-Type только при теле (GET без лишнего заголовка)
  * — Сетевые сбои fetch → понятная ошибка
  */
-async function request(method, path, { body, token, params } = {}) {
+async function request(method, path, { body, token, params, baseUrl } = {}) {
   const headers = { Accept: 'application/json, application/problem+json' }
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-  let url = `${BASE_URL}${path}`
+  // Если path — уже полный URL, не добавляем BASE_URL
+  const isAbsolute = path.startsWith('http://') || path.startsWith('https://')
+  let url = isAbsolute ? path : `${BASE_URL}${path}`
   if (params) {
     const query = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
@@ -115,6 +162,11 @@ async function request(method, path, { body, token, params } = {}) {
     err.errors = payload.errors || null
     err.detail = payload.detail || payload.message || null
     err.responseBody = payload
+    /** Сырой ответ (для отладки 500 в консоли / Sentry) */
+    err.rawResponse = typeof text === 'string' ? text.slice(0, 4000) : ''
+    if (import.meta.env.DEV && res.status >= 500) {
+      console.warn('[api]', res.status, url, err.rawResponse?.slice(0, 800) || '(пустое тело)')
+    }
     throw err
   }
 
@@ -140,6 +192,23 @@ async function uploadFileDisabled() {
 }
 
 export const api = {
+    // ===================== DIPLOMA CLAIMS =====================
+
+  /** POST /api/student/diploma-claims — заявка студента на привязку диплома */
+  createStudentDiplomaClaim: (data, token) =>
+    request('POST', '/api/student/diploma-claims', { body: data, token }),
+
+  /** GET /api/university/diploma-claims/pending — pending заявки для вуза */
+  getUniversityPendingDiplomaClaims: (token) =>
+    request('GET', '/api/university/diploma-claims/pending', { token }),
+
+  /** POST /api/university/diploma-claims/{requestId}/review — одобрить/отклонить */
+  reviewUniversityDiplomaClaim: (requestId, data, token) =>
+    request(
+      'POST',
+      `/api/university/diploma-claims/${encodeURIComponent(requestId)}/review`,
+      { body: data, token }
+    ),
   // ===================== AUTH =====================
 
   login: (data) => request('POST', '/api/auth/login', { body: data }),
@@ -153,30 +222,90 @@ export const api = {
   registerEmployer: (data) =>
     request('POST', '/api/auth/register/employer', { body: data }),
 
+  // ===================== PUBLIC / EMPLOYER SEARCH =====================
+
+  /** GET /api/public/certificates/search?diplomaNumber= (без авторизации) */
+  publicCertificatesSearch: (params) =>
+    request('GET', '/api/public/certificates/search', { params }),
+
+  /** GET /api/employer/certificates/search?diplomaNumber= (Bearer EMPLOYER) */
+  employerCertificatesSearch: (params, token) =>
+    request('GET', '/api/employer/certificates/search', { params, token }),
+
   // ===================== CERTIFICATES =====================
 
   issueCertificate: (data, token) =>
     request('POST', '/api/certificates', { body: data, token }),
 
-  /** GET /api/certificates/my — список дипломов студента (массив) */
-  getMyCertificates: (token) => request('GET', '/api/certificates/my', { token }),
-
-  /** GET /api/certificates/my/{certificateId} */
-  getMyCertificateById: (certificateId, token) =>
-    request('GET', `/api/certificates/my/${encodeURIComponent(certificateId)}`, { token }),
-
+/** GET /api/certificates/my — список дипломов студента (массив) */
+getMyCertificates: async (token) => {
+  const data = await request('GET', '/api/certificates/my', { token })
+  return normalizeCertificates(data)
+},
+/** GET /api/certificates/my/{certificateId} */
+getMyCertificateById: async (certificateId, token) => {
+  const data = await request(
+    'GET',
+    `/api/certificates/my/${encodeURIComponent(certificateId)}`,
+    { token }
+  )
+  return normalizeCertificate(data)
+},
   // ===================== QR =====================
 
   generateCertificateQr: (certificateId, token) =>
     request('POST', `/api/qr/certificates/${encodeURIComponent(certificateId)}`, { token }),
 
-  // ===================== CRYPTO (TEST) =====================
+  // ===================== PUBLIC VERIFY BY QR =====================
 
-  cryptoVerify: (params, token) =>
-    request('GET', '/api/test/crypto/verify', { params, token }),
+  /** POST /api/v1/verifications/qr — верификация по QR (порт 8082, без авторизации) */
+  verifyByQr: async (data) => {
+    const VERIFY_BASE = (import.meta.env.VITE_VERIFY_API_BASE_URL || 'http://26.86.179.119:8082').replace(/\/$/, '')
 
-  cryptoSign: (params, token) =>
-    request('GET', '/api/test/crypto/sign', { params, token }),
+    const headers = {
+      Accept: 'application/json, application/problem+json',
+      'Content-Type': 'application/json',
+    }
+
+    const url = `${VERIFY_BASE}/api/v1/verifications/qr`
+
+    let res
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      })
+    } catch (e) {
+      const msg = `Нет связи с сервером верификации (${VERIFY_BASE}): проверьте VPN/Tailscale и CORS на бэкенде.`
+      const err = new Error(msg)
+      err.cause = e
+      throw err
+    }
+
+    const text = await res.text()
+    if (!res.ok) {
+      const payload = parseBody(text)
+      const err = new Error(pickErrorMessage(payload, res.status))
+      err.status = res.status
+      err.detail = payload.detail || payload.message || null
+      throw err
+    }
+
+    if (res.status === 204) return null
+    if (!text || !String(text).trim()) return null
+    const t = String(text).trim()
+    if (t.startsWith('{') || t.startsWith('[')) {
+      try {
+        return JSON.parse(text)
+      } catch {
+        return null
+      }
+    }
+    return null
+  },
+
+  // ===================== ПУБЛИЧНАЯ ВЕРИФИКАЦИЯ =====================
 
   /**
    * Публичная верификация — работает БЕЗ токена.
@@ -213,7 +342,7 @@ export const api = {
   },
 
   verify: async () => {
-    throw new Error('Используйте cryptoVerify или локальный поиск по номеру')
+    throw new Error('Используйте поиск по номеру диплома')
   },
 
   verifyBulk: async () => {

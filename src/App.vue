@@ -29,6 +29,12 @@ router.beforeEach(() => {
 })
 
 router.afterEach(() => {
+  // Сбрасываем состояние загрузки после завершения навигации
+  isRouteLoading.value = false
+})
+
+// Обработка ошибок навигации (например, когда guard вызывает next(false))
+router.onError(() => {
   isRouteLoading.value = false
 })
 

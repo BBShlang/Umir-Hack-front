@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../../composables/useAuth.js'
+import { isValidEmail } from '../../utils/validators.js'
 
 const router = useRouter()
 const { register } = useAuth()
@@ -56,8 +57,7 @@ function validate() {
     error.value = 'Пароль должен содержать минимум 6 символов'
     return false
   }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(emailVal.value)) {
+  if (!isValidEmail(emailVal.value)) {
     error.value = 'Неверный формат email'
     return false
   }

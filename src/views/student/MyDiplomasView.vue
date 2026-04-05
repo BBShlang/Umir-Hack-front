@@ -257,7 +257,7 @@
                   <Shield :size="24" />
                 </div>
                 <h4>Безопасность</h4>
-                <p>Все дипломы защищены криптографической подписью вуза.</p>
+                <p>Все дипломы проходят проверку через государственный реестр.</p>
               </div>
               
               <div class="info-card sidebar-card-support">
@@ -360,6 +360,7 @@ import {
   Maximize2, Eye
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import VerificationTracker from '../../components/student/VerificationTracker.vue'
 import { loadAllCertificates } from '../../utils/certificatesStore.js'
@@ -368,6 +369,10 @@ import { api } from '../../api/api.js'
 
 const router = useRouter()
 const { user, accessToken, logout } = useAuth()
+
+function displayNameFromListItem(item) {
+  return item.fullName || item.maskedFullName || user.value?.name || '—'
+}
 
 /** Нормализация статуса бэкенда (ACTIVE) → бейдж (active) */
 function normalizeDiplomaStatus(s) {
@@ -397,12 +402,12 @@ function mapCertToCard(c) {
   }
 }
 
-/** Ответ GET /api/certificates/my (StudentCertificateItemResponse) */
+/** Ответ GET /api/certificates/my (StudentCertificateItemResponse — без fullName в списке) */
 function mapApiItemToCard(item) {
   return {
     id: item.certificateId,
     studentId: user.value?.studentId,
-    fullName: item.diplomaNumber || 'Диплом',
+    fullName: displayNameFromListItem(item),
     degree: 'Диплом',
     number: item.diplomaNumber,
     serialNumber: item.diplomaNumber,
@@ -426,6 +431,7 @@ const showFullscreen = ref(false)
 
 const FIXED_TTL = '24h'
 const qrUrl = ref('')
+const qrId = ref('')
 const qrExpiry = ref(null)
 const timeLeft = ref(null)
 const copied = ref(false)
@@ -502,7 +508,8 @@ const stopCountdown = () => {
 
 // Обработчик клика вне меню шеринга
 useEventListener(document, 'mousedown', (event) => {
-  if (shareMenuRef.value && !shareMenuRef.value.contains(event.target)) {
+  const el = shareMenuRef.value?.$el ?? shareMenuRef.value
+  if (el instanceof Element && !el.contains(event.target)) {
     showShareMenu.value = false
   }
 })
@@ -530,6 +537,7 @@ const handleShare = (id) => {
     resetQR()
   } else {
     expandedId.value = id
+    qrId.value = ''
     qrUrl.value = ''
     qrActive.value = true
     qrExpiry.value = null
@@ -543,15 +551,19 @@ const generateQR = async () => {
 
   try {
     const res = await api.generateCertificateQr(expandedId.value, accessToken.value)
-    const link =
-      res.qrContent ||
-      `${window.location.origin}/verify?certificateId=${encodeURIComponent(res.certificateId || expandedId.value)}&token=${encodeURIComponent(res.token || '')}`
-    qrUrl.value = link
+    // Используем ВСЕ поля ответа эндпоинта: qrId, certificateId, token, qrContent, expiresAt
+    console.log('[QR] Полный ответ от бэкенда:', JSON.stringify(res, null, 2))
+    qrId.value = res.qrId || ''
+    // QR ведёт на фронтенд (localhost:5173 в dev или production URL)
+    const frontendHost = window.location.origin
+    qrUrl.value = `${frontendHost.replace(/\/$/, '')}/verify/qr?certificateId=${encodeURIComponent(res.certificateId || expandedId.value)}&token=${encodeURIComponent(res.token || '')}`
+    console.log('[QR] Данные зашитые в QR-код:', qrUrl.value)
     qrExpiry.value = res.expiresAt ? new Date(res.expiresAt) : new Date(Date.now() + 24 * 3600000)
     qrActive.value = true
     startCountdown()
     showNotification('QR-код успешно сгенерирован')
   } catch (e) {
+    qrId.value = ''
     qrUrl.value = ''
     qrExpiry.value = null
     stopCountdown()
@@ -577,6 +589,7 @@ const copyToClipboard = async () => {
 
 // Сброс QR-состояния
 const resetQR = () => {
+  qrId.value = ''
   qrUrl.value = ''
   qrExpiry.value = null
   timeLeft.value = null
@@ -586,6 +599,7 @@ const resetQR = () => {
 
 // Отзыв доступа к QR-коду
 const revokeQR = () => {
+  qrId.value = ''
   qrActive.value = false
   qrUrl.value = ''
   stopCountdown()

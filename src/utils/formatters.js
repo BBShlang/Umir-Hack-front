@@ -72,10 +72,16 @@ export function formatFileSize(bytes) {
  * @returns {string}
  */
 export function pluralize(n, forms) {
-  const abs = Math.abs(n) % 100
+  const abs = Math.abs(n)
   const lastDigit = abs % 10
+  const lastTwoDigits = abs % 100
 
-  if (abs > 10 && abs < 20) return forms[2]
+  // Особый случай для чисел 11-14 (включая 111-114, 211-214 и т.д.)
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return forms[2]
+  }
+  
+  // Для остальных случаев
   if (lastDigit === 1) return forms[0]
   if (lastDigit >= 2 && lastDigit <= 4) return forms[1]
   return forms[2]

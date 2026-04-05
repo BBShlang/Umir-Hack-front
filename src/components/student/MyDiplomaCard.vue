@@ -3,8 +3,8 @@
     <div class="diploma-card__header">
       <div class="diploma-card__title">{{ diploma.universityName || 'Диплом' }}</div>
       <StatusBadge
-        :status="diploma.isVerified ? 'verified' : 'pending'"
-        :label="diploma.isVerified ? 'Подтверждён' : 'Не подтверждён'"
+        :status="isVerified ? 'verified' : 'pending'"
+        :label="isVerified ? 'Подтверждён' : 'Не подтверждён'"
       />
     </div>
 
@@ -15,11 +15,11 @@
       </div>
       <div class="diploma-card__row">
         <span class="diploma-card__label">Номер</span>
-        <span class="diploma-card__value">{{ diploma.number ?? '—' }}</span>
+        <span class="diploma-card__value">{{ diploma.number ?? diploma.diplomaNumber ?? '—' }}</span>
       </div>
       <div class="diploma-card__row">
         <span class="diploma-card__label">Дата выдачи</span>
-        <span class="diploma-card__value">{{ formatDate(diploma.issueDate) }}</span>
+        <span class="diploma-card__value">{{ formatDate(diploma.issueDate || diploma.issuedAt) }}</span>
       </div>
       <div class="diploma-card__row">
         <span class="diploma-card__label">Специальность</span>
@@ -47,8 +47,18 @@ const props = defineProps({
 
 defineEmits(['click'])
 
+const isVerified = computed(() => {
+  // Поддержка и старой модели, и новой из Swagger
+  if (typeof props.diploma.isVerified === 'boolean') return props.diploma.isVerified
+  return props.diploma.status === 'ACTIVE'
+})
+
 const shortHash = computed(() => {
-  const h = props.diploma.hash || ''
+  const h =
+    props.diploma.hash ||
+    props.diploma.payloadHash ||
+    props.diploma.certificateId ||
+    ''
   return h.length > 12 ? h.slice(0, 6) + '…' + h.slice(-4) : h || '—'
 })
 
@@ -61,7 +71,6 @@ function formatDate(dateStr) {
   })
 }
 </script>
-
 <style scoped>
 .diploma-card {
   background: #ffffff;

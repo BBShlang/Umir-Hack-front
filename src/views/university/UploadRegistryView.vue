@@ -35,37 +35,8 @@
             <h2 class="upload__how-title">Загрузите файл реестра</h2>
           </div>
           <div class="upload__uploader-card">
-            <RegistryUploader @submit="onSubmit" @error="onError" />
+            <RegistryUploader @import-complete="onImportComplete" @error="onError" />
           </div>
-        </div>
-      </section>
-
-      <!-- ===== Лог генерации ===== -->
-      <section v-if="uploadLog.length" class="upload__log-section">
-        <div class="container">
-          <div class="upload__log-head">
-            <p class="upload__how-eyebrow">Процесс</p>
-            <h2 class="upload__how-title">Лог генерации хешей</h2>
-          </div>
-          <div class="upload__log-list">
-            <div v-for="entry in uploadLog" :key="entry.id" class="upload__log-entry">
-              <span class="upload__log-time">{{ entry.time }}</span>
-              <span class="upload__log-message" :class="entry.type">{{ entry.message }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===== CTA ===== -->
-      <section class="upload__cta">
-        <div class="container upload__cta-inner">
-          <h2 class="upload__how-title" style="margin-bottom: var(--space-3); color: #fff;">Нужен формат файла?</h2>
-          <p class="upload__subtitle" style="margin: 0 auto var(--space-6); max-width: 600px;">
-            Скачайте шаблон CSV для правильного заполнения данных
-          </p>
-          <button class="upload__btn upload__btn--primary upload__btn--lg" @click="downloadTemplate">
-            Скачать шаблон CSV
-          </button>
         </div>
       </section>
     </main>
@@ -75,13 +46,14 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import RegistryUploader from '../../components/university/RegistryUploader.vue'
 import { useAuth } from '../../composables/useAuth.js'
-import { useDiplomas } from '../../composables/useDiplomas.js'
 
+const router = useRouter()
 const { user } = useAuth()
-const { createDiploma } = useDiplomas()
 
 const uploadLog = ref([])
 let logId = 1
@@ -95,72 +67,27 @@ function addLog(message, type = 'info') {
   })
 }
 
-function pickField(row, keys, fallback = '') {
-  for (const k of keys) {
-    if (row[k] != null && String(row[k]).trim() !== '') return String(row[k]).trim()
-  }
-  return fallback
-}
-
-async function onSubmit(records) {
-  const uni = user.value?.universityCode
-  if (!uni) {
-    addLog('В профиле нет кода университета. Войдите как ВУЗ или укажите код при регистрации.', 'error')
-    return
+function onImportComplete(result) {
+  addLog(`Импорт завершён: ${result.importedRows} из ${result.totalRows} записей`, 'success')
+  
+  if (result.failedRows > 0) {
+    addLog(`Не удалось импортировать: ${result.failedRows} записей`, 'error')
   }
 
-  addLog(`Начало выпуска через API: ${records.length} записей`, 'info')
-
-  let ok = 0
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i]
-    const rowNum = i + 2
-    try {
-      const studentId = pickField(r, ['studentId', 'StudentId', 'UUID студента', 'uuid'])
-      const diplomaNumber = pickField(r, ['diplomaNumber', 'serialNumber', 'Серийный номер', 'Номер'])
-      const fullName = pickField(r, ['fullName', 'studentName', 'ФИО', 'student_name'])
-      const specialty = pickField(r, ['specialty', 'Специальность'])
-      const gy = pickField(r, ['graduationYear', 'year', 'Год', 'issueDate'], String(new Date().getFullYear()))
-      const graduationYear = parseInt(gy, 10) || new Date().getFullYear()
-
-      if (!studentId || !diplomaNumber || !fullName || !specialty) {
-        addLog(`Строка ${rowNum}: не хватает полей (нужны studentId, номер, ФИО, специальность)`, 'error')
-        continue
-      }
-
-      await createDiploma({
-        universityCode: uni,
-        studentId,
-        diplomaNumber,
-        fullName,
-        specialty,
-        graduationYear,
-      })
-      ok++
-      addLog(`Строка ${rowNum}: выпущен ${diplomaNumber}`, 'success')
-    } catch (e) {
-      addLog(`Строка ${rowNum}: ${e.message || 'ошибка'}`, 'error')
-    }
+  if (result.errors?.length) {
+    result.errors.forEach(err => {
+      addLog(`Строка ${err.rowNumber}: ${err.message}`, 'error')
+    })
   }
 
-  addLog(`Готово: успешно ${ok} из ${records.length}`, ok === records.length ? 'success' : 'info')
+  // Перенаправляем на страницу реестра через 2 секунды
+  setTimeout(() => {
+    router.push('/university/diplomas')
+  }, 2000)
 }
 
 function onError(err) {
   addLog(`Ошибка: ${err}`, 'error')
-}
-
-function downloadTemplate() {
-  // Заглушка для скачивания шаблона
-  const headers = 'studentId,diplomaNumber,fullName,specialty,graduationYear\n'
-  const sample = 'ed97654b-7963-4ef2-97af-99fc78753d5a,DIP-2026-001,Иванов Иван Иванович,Программная инженерия,2026\n'
-  const blob = new Blob([headers + sample], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'registry_template.csv'
-  a.click()
-  URL.revokeObjectURL(url)
 }
 </script>
 

@@ -11,6 +11,19 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       allowedHosts: ['buoyantly-positive-prawn.cloudpub.ru'],
       proxy: {
+        // ВАЖНО: /verify-qr должен быть ПЕРЕД /api чтобы не перехватываться
+        '/verify-qr': {
+          target: env.VITE_VERIFY_API_BASE_URL || 'http://localhost:8082',
+          changeOrigin: true,
+          timeout: 120_000,
+          proxyTimeout: 120_000,
+          rewrite: (path) => path.replace(/^\/verify-qr/, ''),
+          rewriteRequestHeaders: (headers) => {
+            delete headers.origin;
+            delete headers.referer;
+            return headers;
+          },
+        },
         '/api': {
           target: env.VITE_API_BASE_URL || 'http://localhost:8081',
           changeOrigin: true,

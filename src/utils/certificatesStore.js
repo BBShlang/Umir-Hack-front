@@ -1,6 +1,6 @@
 /**
  * Локальное хранилище выпущенных дипломов (сертификатов).
- * Бэкенд отдаёт только POST /api/certificates без списка — кэшируем ответы для UI.
+ * Локальный кэш выпусков (POST /api/certificates): у ВУЗа в спецификации нет GET списка — таблица в ЛК строится из этого кэша.
  */
 const KEY = 'dipregistry_certificates_v1'
 
@@ -22,6 +22,13 @@ export function saveAllCertificates(list) {
 export function appendCertificate(rec) {
   const all = loadAllCertificates()
   all.unshift(rec)
+  saveAllCertificates(all)
+}
+
+export function appendCertificates(records) {
+  if (!Array.isArray(records) || records.length === 0) return
+  const all = loadAllCertificates()
+  all.unshift(...records)
   saveAllCertificates(all)
 }
 

@@ -25,15 +25,15 @@ const routes = [
     component: () => import('../views/hr/VerifyView.vue')
   },
   {
+    path: '/verify/qr',
+    name: 'verify-qr',
+    component: () => import('../views/public/PublicVerifyView.vue')
+  },
+  {
     path: '/verify/share/:token',
     name: 'verify-share',
     component: () => import('../views/hr/VerifyView.vue'),
     props: true
-  },
-  {
-    path: '/api-docs',
-    name: 'api-docs',
-    component: () => import('../views/public/ApiDocsView.vue')
   },
   {
     path: '/privacy',
@@ -44,6 +44,11 @@ const routes = [
     path: '/terms',
     name: 'terms',
     component: () => import('../views/public/TermsView.vue')
+  },
+  {
+    path: '/forbidden',
+    name: 'forbidden',
+    component: () => import('../views/public/ForbiddenView.vue')
   },
 
   // ЛК ВУЗа
@@ -69,6 +74,12 @@ const routes = [
     component: () => import('../views/university/DiplomasListView.vue'),
     meta: { role: 'university' }
   },
+  {
+    path: '/university/claims',
+    name: 'university-claims',
+    component: () => import('../views/university/ClaimsView.vue'),
+    meta: { role: 'university' }
+  },
   // ЛК Студента
   {
     path: '/student',
@@ -86,6 +97,12 @@ const routes = [
     component: () => import('../views/student/MyDiplomasView.vue'),
     meta: { role: 'student' }
   },
+  {
+    path: '/student/search',
+    name: 'student-search',
+    component: () => import('../views/student/SearchDiplomaView.vue'),
+    meta: { role: 'student' }
+  },
 
 
   // HR-портал
@@ -97,12 +114,6 @@ const routes = [
     path: '/hr/verify',
     name: 'hr-verify',
     component: () => import('../views/hr/VerifyView.vue'),
-    meta: { role: 'hr' }
-  },
-  {
-    path: '/hr/reports',
-    name: 'hr-reports',
-    component: () => import('../views/hr/ReportsView.vue'),
     meta: { role: 'hr' }
   },
 
@@ -126,11 +137,12 @@ router.beforeEach((to, from, next) => {
     'login',
     'register',
     'verify',
+    'verify-qr',
     'verify-share',
-    'api-docs',
     'not-found',
     'privacy',
     'terms',
+    'forbidden',
   ]
   if (publicRoutes.includes(to.name)) {
     return next()

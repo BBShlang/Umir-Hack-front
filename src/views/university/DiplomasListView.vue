@@ -1,5 +1,6 @@
 <template>
   <div class="diplomas-list-view">
+    <AppHeader />
     <main class="main-content">
       <!-- ===== HERO ===== -->
       <section class="diplomas__hero">
@@ -45,6 +46,9 @@
           <div class="diplomas__table-head">
             <p class="diplomas__how-eyebrow">Выпуск</p>
             <h2 class="diplomas__how-title">Новый диплом</h2>
+            <p class="diplomas__how-desc">
+              Тело POST /api/certificates: universityCode,, diplomaNumber, fullName, specialty, graduationYear.
+            </p>
           </div>
           <form class="issue-form" @submit.prevent="onIssueSubmit">
             <div class="issue-form__grid">
@@ -53,20 +57,16 @@
                 <input v-model="issueForm.universityCode" type="text" required placeholder="AITU-01" />
               </label>
               <label class="issue-form__field">
-                <span>UUID студента</span>
-                <input v-model="issueForm.studentId" type="text" required placeholder="ed97654b-7963-4ef2-97af-99fc78753d5a" />
-              </label>
-              <label class="issue-form__field">
                 <span>Номер диплома</span>
                 <input v-model="issueForm.diplomaNumber" type="text" required placeholder="DIP-2026-001" />
               </label>
               <label class="issue-form__field">
                 <span>ФИО выпускника</span>
-                <input v-model="issueForm.fullName" type="text" required />
+                <input v-model="issueForm.fullName" type="text" required placeholder="Иванов Иван Иванович" />
               </label>
               <label class="issue-form__field">
                 <span>Специальность</span>
-                <input v-model="issueForm.specialty" type="text" required />
+                <input v-model="issueForm.specialty" type="text" required placeholder="Информатика" />
               </label>
               <label class="issue-form__field">
                 <span>Год выпуска</span>
@@ -126,6 +126,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { onBeforeRouteUpdate } from 'vue-router'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import DataTable from '../../components/common/DataTable.vue'
 import SearchInput from '../../components/common/SearchInput.vue'
@@ -163,7 +165,6 @@ const pagination = computed(() => ({
 
 const issueForm = ref({
   universityCode: user.value?.universityCode || '',
-  studentId: '',
   diplomaNumber: '',
   fullName: '',
   specialty: '',
@@ -192,6 +193,10 @@ const columns = [
 ]
 
 onMounted(() => {
+  fetchDiplomas()
+})
+
+onBeforeRouteUpdate(() => {
   fetchDiplomas()
 })
 
@@ -238,6 +243,7 @@ async function confirmRevoke() {
   if (!revokingDiploma.value) return
   await revokeDiploma(revokingDiploma.value.id)
   revokingDiploma.value = null
+  await fetchDiplomas()
 }
 </script>
 

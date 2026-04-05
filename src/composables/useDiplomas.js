@@ -10,16 +10,6 @@ import {
   patchCertificate,
 } from '../utils/certificatesStore.js'
 
-const loading = ref(false)
-const error = ref(null)
-const page = ref(1)
-const pageSize = ref(10)
-const searchQuery = ref('')
-const statusFilter = ref(null)
-const allRows = ref([])
-const sortField = ref('createdAt')
-const sortDir = ref('desc')
-
 function trim(s) {
   return String(s ?? '').trim()
 }
@@ -36,10 +26,7 @@ function normalizeIssueRequest(data) {
   const graduationYear = Number(data.graduationYear)
 
   if (!universityCode) throw new Error('Укажите код университета')
-  if (!studentId) throw new Error('Укажите UUID студента')
-  if (!UUID_RE.test(studentId)) {
-    throw new Error('Поле «UUID студента» должно быть в формате UUID (как в ответе регистрации студента)')
-  }
+
   if (!diplomaNumber) throw new Error('Укажите номер диплома')
   if (!fullName) throw new Error('Укажите ФИО')
   if (!specialty) throw new Error('Укажите специальность')
@@ -61,13 +48,13 @@ function recordFromIssue(req, res) {
   return {
     id: res.certificateId,
     serialNumber: res.diplomaNumber,
+    studentId: req.studentId,
     studentName: req.fullName,
     specialty: req.specialty,
     issueDate: res.issuedAt,
     status: 'active',
     hash: res.payloadHash,
     signature: res.signature,
-    studentId: req.studentId,
     universityCode: req.universityCode,
     graduationYear: req.graduationYear,
   }
@@ -75,6 +62,16 @@ function recordFromIssue(req, res) {
 
 export function useDiplomas() {
   const { accessToken } = useAuth()
+
+  const loading = ref(false)
+  const error = ref(null)
+  const page = ref(1)
+  const pageSize = ref(10)
+  const searchQuery = ref('')
+  const statusFilter = ref(null)
+  const allRows = ref([])
+  const sortField = ref('createdAt')
+  const sortDir = ref('desc')
 
   function reloadFromStorage() {
     allRows.value = loadAllCertificates()

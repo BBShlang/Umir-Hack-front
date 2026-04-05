@@ -127,6 +127,11 @@ export function useAuth() {
   }
 
   async function logout() {
+    try {
+      await api.logout()
+    } catch {
+      // Игнорируем ошибки при выходе
+    }
     user.value = null
     accessToken.value = null
     localStorage.removeItem('access_token')

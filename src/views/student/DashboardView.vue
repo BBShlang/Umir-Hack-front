@@ -18,9 +18,10 @@
             </h1>
 
             <p class="dashboard__subtitle">
-              Найдите свой диплом по номеру или ФИО, поделитесь с работодателем и отслеживайте проверки.
+              Публичный поиск по номеру диплома (GET /api/public/certificates/search). Полный список ваших дипломов — в разделе «Мои дипломы» (GET /api/certificates/my).
             </p>
             <div class="dashboard__hero-actions">
+              <router-link to="/student/search" class="dashboard__btn dashboard__btn--primary">Найти диплом</router-link>
               <router-link to="/student/diplomas" class="dashboard__btn dashboard__btn--outline">Мои дипломы</router-link>
             </div>
           </div>
@@ -34,8 +35,8 @@
             <Search :size="24" class="banner-icon" />
           </div>
           <div class="banner-text">
-            <h4>Быстрый поиск диплома</h4>
-            <p>Введите номер диплома или начните вводить ФИО — система подскажет совпадения из вашего профиля.</p>
+            <h4>Поиск в публичном реестре</h4>
+            <p>Укажите номер диплома — запрос без авторизации, как в OpenAPI бэкенда.</p>
           </div>
         </div>
       </div>
@@ -47,42 +48,28 @@
             <!-- Левая колонка: форма поиска -->
             <section class="section-pro">
               <div class="section-header">
-                <h2>Поиск диплома</h2>
+                <h2>Поиск по номеру</h2>
                 <span class="badge">Онлайн</span>
               </div>
 
               <div class="dashboard__search-card">
                 <form @submit.prevent="onSearch" class="sf">
                   <div class="sf-field">
-                    <label class="sf-label">Номер диплома или ФИО</label>
+                    <label class="sf-label">Номер диплома (diplomaNumber)</label>
                     <div class="sf-input-wrapper">
                       <Search :size="18" class="sf-input-icon" />
                       <input
                         v-model="searchQuery"
                         type="text"
                         class="sf-input"
-                        placeholder="Например: DIP-2023-001"
+                        placeholder="Например: DIP-2026-001"
                         autocomplete="off"
                         spellcheck="false"
-                        @input="onSearchInput"
-                        @focus="showSuggestions = true"
                       />
                     </div>
-
-                    <!-- Автодополнение ФИО -->
-                    <Transition name="sf-fade">
-                      <ul v-if="showSuggestions && filteredNames.length" class="sf-suggestions">
-                        <li
-                          v-for="(name, idx) in filteredNames"
-                          :key="idx"
-                          class="sf-suggestion"
-                          @click="selectName(name)"
-                        >
-                          <User :size="14" />
-                          {{ name }}
-                        </li>
-                      </ul>
-                    </Transition>
+                    <p class="sf-hint">
+                      Только номер диплома (как в Swagger: query <code class="sf-hint-code">diplomaNumber</code>). ФИО сюда не передаётся.
+                    </p>
                   </div>
 
                   <button type="submit" class="sf-btn" :disabled="loading || !searchQuery.trim()">
@@ -116,7 +103,7 @@
                       <div class="sf-detail-row">
                         <Calendar :size="16" class="sf-detail-icon" />
                         <span class="sf-detail-k">Дата выдачи</span>
-                        <span class="sf-detail-v">{{ diplomaResult.issueDate || '—' }}</span>
+                        <span class="sf-detail-v">{{ diplomaResult.issuedAt || '—' }}</span>
                       </div>
                       <div class="sf-detail-row">
                         <ShieldCheck :size="16" class="sf-detail-icon" />
@@ -143,7 +130,7 @@
                   <ShieldCheck :size="24" />
                 </div>
                 <h4>Безопасность</h4>
-                <p>Все дипломы защищены криптографической подписью вуза и проверяются в реальном времени.</p>
+                <p>Все дипломы проходят проверку через государственный реестр в реальном времени.</p>
               </div>
 
               <div class="info-card">
@@ -171,114 +158,68 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import {
-  Search, User, CheckCircle, AlertCircle, Building2, GraduationCap,
+  Search, CheckCircle, AlertCircle, Building2, GraduationCap,
   Calendar, ShieldCheck, FileSearch, Loader2
 } from 'lucide-vue-next'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 import StatusBadge from '../../components/common/StatusBadge.vue'
+import { api } from '../../api/api.js'
+import {
+  validatePublicSearchDiplomaNumberInput,
+  isCertificateNotFoundError,
+} from '../../utils/publicDiplomaSearch.js'
+
+function formatIssueDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toLocaleDateString('ru-RU')
+}
 
 // ========== Поиск диплома ==========
 const searchQuery = ref('')
 const loading = ref(false)
 const diplomaResult = ref(null)
 const searchError = ref('')
-const showSuggestions = ref(false)
-
-// Имена из localStorage (записанные при регистрации)
-const registeredNames = ref([])
-
-// Загрузка имён из localStorage
-function loadRegisteredNames() {
-  const names = []
-  // Имитируем: при регистрации имя сохраняется
-  const stored = localStorage.getItem('user_name')
-  if (stored) names.push(stored)
-
-  // Моковые данные для демонстрации (пока нет бэкенда)
-  if (!names.length) {
-    names.push('Иванов Иван Иванович')
-    names.push('Петрова Мария Сергеевна')
-  }
-
-  registeredNames.value = names
-}
-
-const filteredNames = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return registeredNames.value
-  return registeredNames.value.filter(n => n.toLowerCase().includes(q))
-})
-
-function onSearchInput() {
-  showSuggestions.value = true
-}
-
-function selectName(name) {
-  searchQuery.value = name
-  showSuggestions.value = false
-}
-
-// Закрытие подсказок при клике вне
-function handleClickOutside(e) {
-  if (!e.target.closest('.sf-field')) {
-    showSuggestions.value = false
-  }
-}
 
 async function onSearch() {
-  if (!searchQuery.value.trim()) return
+  const v = validatePublicSearchDiplomaNumberInput(searchQuery.value)
+  if (!v.ok) {
+    searchError.value = v.message
+    diplomaResult.value = null
+    return
+  }
 
   loading.value = true
   searchError.value = ''
   diplomaResult.value = null
-  showSuggestions.value = false
 
   try {
-    await new Promise(r => setTimeout(r, 800))
-
-    const q = searchQuery.value.trim()
-    // Мок-поиск: если это похоже на номер или ФИО
-    const isNumber = /^\d/i.test(q)
-
-    if (isNumber) {
-      // Поиск по номеру — моковый результат
+    const cert = await api.publicCertificatesSearch({ diplomaNumber: v.query })
+    const st = String(cert?.status || '').toUpperCase()
+    const ok = st === 'ACTIVE'
+    diplomaResult.value = {
+      isValid: ok,
+      status: String(cert?.status || '').toLowerCase() || 'unknown',
+      statusClass: ok ? 'sf-res--ok' : 'sf-res--fail',
+      title: ok ? 'Диплом найден' : `Запись найдена (статус: ${cert?.status || '—'})`,
+      university: cert?.universityName || '—',
+      specialty: cert?.specialty || '—',
+      issuedAt: formatIssueDate(cert?.issuedAt),
+    }
+  } catch (err) {
+    if (isCertificateNotFoundError(err)) {
       diplomaResult.value = {
-        isValid: true,
-        status: 'active',
-        statusClass: 'sf-res--ok',
-        title: 'Диплом найден',
-        university: 'МГТУ им. Баумана',
-        specialty: 'Информатика и вычислительная техника',
-        issueDate: '15.06.2025'
+        isValid: false,
+        statusClass: 'sf-res--fail',
+        title: 'Диплом не найден',
       }
     } else {
-      // Поиск по ФИО — моковый результат
-      const found = registeredNames.value.some(n =>
-        n.toLowerCase().includes(q.toLowerCase())
-      )
-
-      if (found) {
-        diplomaResult.value = {
-          isValid: true,
-          status: 'active',
-          statusClass: 'sf-res--ok',
-          title: 'Диплом найден',
-          university: 'МГТУ им. Баумана',
-          specialty: 'Информатика и вычислительная техника',
-          issueDate: '15.06.2025'
-        }
-      } else {
-        diplomaResult.value = {
-          isValid: false,
-          statusClass: 'sf-res--fail',
-          title: 'Диплом не найден'
-        }
-      }
+      searchError.value = err.message || 'Ошибка при поиске. Попробуйте позже.'
     }
-  } catch {
-    searchError.value = 'Ошибка при поиске. Попробуйте позже.'
   } finally {
     loading.value = false
   }
@@ -288,9 +229,6 @@ async function onSearch() {
 const recentVerifications = ref([])
 
 onMounted(() => {
-  loadRegisteredNames()
-  document.addEventListener('click', handleClickOutside)
-
   setTimeout(() => {
     recentVerifications.value = [
       { id: 1, date: '28.03.2026', checker: 'ООО «ТехноКадры»', status: 'active' },
@@ -410,6 +348,17 @@ onMounted(() => {
   cursor: pointer;
   transition: all var(--transition-base);
   border: 2px solid transparent;
+}
+
+.dashboard__btn--primary {
+  background: var(--color-main-blue);
+  color: #fff;
+  border-color: var(--color-main-blue);
+}
+
+.dashboard__btn--primary:hover {
+  background: #1a5bbd;
+  border-color: #1a5bbd;
 }
 
 .dashboard__btn--outline {
@@ -577,6 +526,21 @@ onMounted(() => {
   outline: none;
   border-color: var(--color-main-blue);
   box-shadow: 0 0 0 3px rgba(38, 75, 130, 0.1);
+}
+
+.sf-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-pale-black);
+  line-height: 1.45;
+}
+
+.sf-hint-code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 /* Suggestions / Autocomplete */

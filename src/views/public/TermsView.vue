@@ -104,8 +104,8 @@
               <h2>11. Контактная информация</h2>
               <p>По вопросам, связанным с использованием Сервиса, обращайтесь:</p>
               <ul>
-                <li>Email: <a href="mailto:support@diploms.ru">support@diploms.ru</a></li>
-                <li>Телефон: <a href="tel:+78001234567">8 (800) 123-45-67</a></li>
+                <li>Email: <a>support@diploms.ru</a></li>
+                <li>Телефон: <a>8 (800) 123-45-67</a></li>
               </ul>
             </section>
 

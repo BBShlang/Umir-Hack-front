@@ -1,16 +1,8 @@
 <template>
   <div class="diploma-actions">
-    <div class="action-buttons">
-      <button class="btn btn-sm btn-outline" @click="emit('download', diploma)">
-        <slot name="download-icon">📄</slot> Скачать
-      </button>
-      <button class="btn btn-sm btn-warning" @click="confirmRevoke">
-        <slot name="revoke-icon">⚠️</slot> Отозвать
-      </button>
-      <button class="btn btn-sm btn-info" @click="emit('share', diploma)">
-        <slot name="share-icon">🔗</slot> Поделиться
-      </button>
-    </div>
+    <button class="btn btn-sm btn-warning" @click="confirmRevoke">
+      <slot name="revoke-icon">⚠️</slot> Отозвать
+    </button>
 
     <ModalDialog :is-open="showRevokeConfirm" size="sm" @close="showRevokeConfirm = false">
       <template #title>Подтверждение отзыва</template>
@@ -29,14 +21,14 @@ import { ref } from 'vue'
 import ModalDialog from '../common/ModalDialog.vue'
 
 /**
- * DiplomaActions — действия над дипломом (скачать, отозвать, поделиться)
+ * DiplomaActions — действия над дипломом (отозвать)
  * @prop {Object} diploma - объект диплома
  */
-defineProps({
+const props = defineProps({
   diploma: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['download', 'revoke', 'share'])
+const emit = defineEmits(['revoke'])
 
 const showRevokeConfirm = ref(false)
 
@@ -45,7 +37,7 @@ function confirmRevoke() {
 }
 
 function revoke() {
-  emit('revoke', diploma)
+  emit('revoke', props.diploma)
   showRevokeConfirm.value = false
 }
 </script>

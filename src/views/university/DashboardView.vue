@@ -82,6 +82,30 @@
                     </button>
                   </div>
                 </div>
+
+                <!-- Card 3: Заявки на привязку -->
+                <div class="dashboard__step" @click="$router.push('/university/claims')">
+                  <div class="card-v-accent card-v-accent--purple" />
+                  <div class="verified-seal verified-seal--purple">
+                    <FileCheck :size="14" />
+                    <span>Заявки</span>
+                  </div>
+                  <div class="card-v-body">
+                    <span class="year-tag-subtle">Шаг 03</span>
+                    <FileCheck :size="40" class="card-icon" />
+                    <h3>Заявки на привязку</h3>
+                    <p class="card-desc">
+                      Студенты отправляют заявки на привязку дипломов. Подтвердите или отклоните.
+                    </p>
+                    <div class="stats-row"></div>
+                  </div>
+                  <div class="card-v-footer">
+                    <button class="btn-share-v btn-share-v--purple">
+                      <span>Открыть заявки</span>
+                      <span class="arrow">→</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </section>
           </div>
@@ -93,8 +117,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Upload, FileText } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
+import { Upload, FileText, FileCheck } from 'lucide-vue-next'
+import AppHeader from '../../components/common/AppHeader.vue'
 import AppFooter from '../../components/common/AppFooter.vue'
 
 const stats = ref({ total: 0, active: 0, revoked: 0, pending: 0 })
@@ -355,6 +380,13 @@ onMounted(() => {
 }
 .verified-seal--green svg { color: #16a34a; }
 
+.verified-seal--purple {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.2);
+}
+.verified-seal--purple svg { color: #a855f7; }
+
 /* Тело карточки */
 .card-v-body {
   padding: 36px 32px 24px;
@@ -439,6 +471,14 @@ onMounted(() => {
 }
 
 .btn-share-v:hover .arrow { transform: translateX(4px); }
+
+.btn-share-v--purple {
+  background: #a855f7;
+}
+
+.btn-share-v--purple:hover {
+  background: #9333ea;
+}
 
 /* ===========================
    АДАПТИВ

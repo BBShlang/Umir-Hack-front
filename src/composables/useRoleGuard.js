@@ -43,7 +43,8 @@ export function useRoleGuard() {
     }
 
     if (role.value !== requiredRole) {
-      router.push({ name: 'forbidden' })
+      // Используем существующий маршрут forbidden
+      router.push({ name: 'forbidden', query: { redirect: route.fullPath } })
       return false
     }
 

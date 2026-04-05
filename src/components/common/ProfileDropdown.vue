@@ -1,8 +1,11 @@
 <template>
   <div class="profile-dropdown" ref="dropdownRef">
-    <!-- Кнопка-кружок профиля -->
-    <button class="profile-dropdown__avatar" @click="isOpen = !isOpen" :title="userInitials">
-      {{ userInitials }}
+    <!-- Кнопка-кружок профиля с иконкой -->
+    <button class="profile-dropdown__avatar" @click="isOpen = !isOpen" title="Профиль">
+      <svg class="profile-dropdown__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
     </button>
 
     <!-- Выпадающее меню -->
@@ -11,6 +14,7 @@
         <div class="profile-dropdown__header">
           <div class="profile-dropdown__info">
             <span class="profile-dropdown__name">{{ userName }}</span>
+            <span class="profile-dropdown__email">{{ userEmail }}</span>
             <span class="profile-dropdown__role">{{ userRoleLabel }}</span>
           </div>
         </div>
@@ -56,13 +60,8 @@ const { user, logout, role } = useAuth()
 const isOpen = ref(false)
 const dropdownRef = ref(null)
 
-const userInitials = computed(() => {
-  const name = user.value?.name || ''
-  if (!name) return '?'
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-})
-
 const userName = computed(() => user.value?.name || 'Пользователь')
+const userEmail = computed(() => user.value?.email || '')
 
 const ROLE_LABELS = {
   university: 'ВУЗ',
@@ -130,14 +129,11 @@ onUnmounted(() => {
 }
 
 .profile-dropdown__avatar {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--color-main-blue);
   color: #fff;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  font-family: var(--font-family);
   border: 2px solid rgba(255, 255, 255, 0.25);
   cursor: pointer;
   display: flex;
@@ -145,12 +141,19 @@ onUnmounted(() => {
   justify-content: center;
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  padding: 0;
 }
 
 .profile-dropdown__avatar:hover {
   background: #1a5bbd;
   border-color: rgba(255, 255, 255, 0.5);
   transform: scale(1.05);
+}
+
+.profile-dropdown__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 /* ===== Меню ===== */
@@ -178,6 +181,15 @@ onUnmounted(() => {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-bold);
   line-height: 1.3;
+}
+
+.profile-dropdown__email {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.3;
+  word-break: break-all;
 }
 
 .profile-dropdown__role {

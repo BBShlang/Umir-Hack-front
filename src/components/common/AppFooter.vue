@@ -25,13 +25,13 @@
                 <svg class="footer-icon" viewBox="0 0 16 16" width="14" height="14">
                   <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V13a1 1 0 01-1 1h-2C7.82 14 2 8.18 2 2V3z" fill="currentColor" />
                 </svg>
-                <a href="tel:+78001234567">8 (800) 123-45-67</a>
+                <a >8 (800) 123-45-67</a>
               </li>
               <li>
                 <svg class="footer-icon" viewBox="0 0 16 16" width="14" height="14">
                   <path d="M.05 3.555A2 2 0 012 2h12a2 2 0 011.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 002 14h12a2 2 0 001.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.437-.758L16 11.801V4.697l-5.802 3.375z" fill="currentColor" />
                 </svg>
-                <a href="mailto:support@diploms.ru">support@diploms.ru</a>
+                <a>support@diploms.ru</a>
               </li>
             </ul>
           </div>

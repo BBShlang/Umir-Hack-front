@@ -1,7 +1,5 @@
 <template>
   <div class="not-found">
-    <AppHeader />
-
     <main class="main-content">
       <!-- ===== HERO 404 ===== -->
       <section class="not-found__hero">
