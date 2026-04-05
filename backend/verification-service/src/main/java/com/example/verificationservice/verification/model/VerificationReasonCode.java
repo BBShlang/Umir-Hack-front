@@ -1,0 +1,15 @@
+package com.example.verificationservice.verification.model;
+
+public enum VerificationReasonCode {
+    SIGNATURE_VERIFIED,
+    CERTIFICATE_NOT_FOUND,
+    CERTIFICATE_INACTIVE,
+    CERTIFICATE_EXPIRED,
+    QR_TOKEN_NOT_FOUND,
+    QR_TOKEN_EXPIRED,
+    QR_TOKEN_REVOKED,
+    PAYLOAD_DECRYPTION_FAILED,
+    HASH_MISMATCH,
+    UNIVERSITY_KEY_NOT_FOUND,
+    SIGNATURE_INVALID
+}

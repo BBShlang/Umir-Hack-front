@@ -1,0 +1,32 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.classpath
+.project
+.settings/
+
+### STS ###
+.apt_generated
+.apt_generated_test
+
+### Visual Studio Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Logs ###
+*.log
